@@ -17,7 +17,10 @@ import (
 	"github.com/terrascore/api/internal/auth"
 	"github.com/terrascore/api/internal/job"
 	"github.com/terrascore/api/internal/land"
+	"github.com/terrascore/api/internal/notification"
 	"github.com/terrascore/api/internal/platform"
+	"github.com/terrascore/api/internal/qa"
+	"github.com/terrascore/api/internal/report"
 	"github.com/terrascore/api/internal/survey"
 	"github.com/terrascore/api/internal/ws"
 )
@@ -65,7 +68,6 @@ func run(ctx context.Context) error {
 
 	// Task queue
 	taskQueue := platform.NewTaskQueue(db, logger)
-	go taskQueue.Start(ctx)
 
 	// S3 client
 	s3Client, err := platform.NewS3Client(cfg.AWS)
@@ -102,13 +104,54 @@ func run(ctx context.Context) error {
 	matcher := job.NewMatcher(agentQueries, jobRepo, logger)
 	dispatcher := job.NewDispatcher(matcher, jobRepo, rdb, eventBus, logger)
 	jobScheduler := job.NewScheduler(jobRepo, landRepo, eventBus, logger)
-	jobHandler := job.NewHandler(jobRepo, agentRepo, surveyRepo, s3Client, rdb, logger)
+	jobHandler := job.NewHandler(jobRepo, agentRepo, surveyRepo, s3Client, rdb, eventBus, logger)
+
+	// QA module
+	qaRepo := qa.NewRepository(db)
+	qaService := qa.NewService(qaRepo, surveyRepo, taskQueue, logger)
+
+	// Notification module
+	notifRepo := notification.NewRepository(db)
+	mockPusher := notification.NewMockPusher(logger)
+	mockEmailer := notification.NewMockEmailer(logger)
+	mockSMS := notification.NewMockSMSSender(logger)
+	notifService := notification.NewService(notifRepo, mockPusher, mockEmailer, mockSMS, logger)
+	notifHandler := notification.NewHandler(notifRepo, authRepo)
+
+	// Report module
+	reportRepo := report.NewRepository(db)
+	reportService := report.NewService(reportRepo, jobRepo, surveyRepo, authRepo, s3Client, taskQueue, logger)
+	reportHandler := report.NewHandler(reportRepo, reportService)
+
+	// Register task handlers
+	taskQueue.Register("qa.score_survey", qaService.HandleTask)
+	taskQueue.Register("report.generate", reportService.HandleTask)
+	taskQueue.Register("notification.send", notifService.HandleTask)
+
+	// Start task queue
+	go taskQueue.Start(ctx)
 
 	// WebSocket handler
 	wsHandler := ws.NewHandler(rdb, keycloakClient, agentRepo, logger)
 
 	// Subscribe dispatcher to job.created events
 	eventBus.Subscribe("job.created", dispatcher.HandleJobCreated)
+
+	// Subscribe to survey.submitted — enqueues QA scoring task
+	eventBus.Subscribe("survey.submitted", func(ctx context.Context, event platform.Event) {
+		payload, ok := event.Payload.(map[string]string)
+		if !ok {
+			logger.Error("invalid survey.submitted payload")
+			return
+		}
+		if err := taskQueue.Enqueue(ctx, "qa.score_survey", qa.SurveyQAPayload{
+			JobID:    payload["job_id"],
+			ParcelID: payload["parcel_id"],
+			UserID:   payload["user_id"],
+		}); err != nil {
+			logger.Error("failed to enqueue QA task", "error", err)
+		}
+	})
 
 	// Start job scheduler
 	go jobScheduler.Start(ctx)
@@ -141,6 +184,11 @@ func run(ctx context.Context) error {
 			r.Mount("/parcels", landHandler.Routes())
 			r.Mount("/agents", agentHandler.Routes())
 			r.Mount("/jobs", jobHandler.Routes())
+			r.Mount("/alerts", notifHandler.Routes())
+
+			// Report routes
+			r.Get("/parcels/{parcelId}/reports", reportHandler.ListByParcel)
+			r.Get("/reports/{id}/download", reportHandler.Download)
 
 			// Agent-specific job/offer routes (explicit to avoid mount conflicts)
 			r.With(auth.RequireRole("agent")).Get("/agents/me/jobs", jobHandler.ListAgentJobs)
@@ -148,8 +196,9 @@ func run(ctx context.Context) error {
 		})
 	})
 
-	_ = taskQueue    // Used in Phase 2+ for durable background tasks
-	_ = dispatcher   // Subscribed via eventBus, kept alive by event loop
+	_ = dispatcher    // Subscribed via eventBus, kept alive by event loop
+	_ = agentService  // Used by agentHandler, kept alive by router
+	_ = landService   // Used by landHandler, kept alive by router
 
 	// Start server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

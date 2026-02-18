@@ -33,3 +33,12 @@ SELECT * FROM survey_media WHERE job_id = $1 ORDER BY captured_at;
 
 -- name: CountMediaByJob :one
 SELECT count(*) FROM survey_media WHERE job_id = $1;
+
+-- name: ListDuplicateHashesForParcel :many
+SELECT sm.file_hash_sha256, count(*) as hash_count
+FROM survey_media sm
+JOIN survey_jobs sj ON sm.job_id = sj.id
+WHERE sj.parcel_id = $1
+  AND sm.file_hash_sha256 != ''
+GROUP BY sm.file_hash_sha256
+HAVING count(*) > 1;

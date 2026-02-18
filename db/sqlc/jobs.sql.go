@@ -621,6 +621,32 @@ func (q *Queries) UpdateJobOfferStatus(ctx context.Context, arg UpdateJobOfferSt
 	return err
 }
 
+const updateJobQA = `-- name: UpdateJobQA :exec
+UPDATE survey_jobs SET
+    qa_score = $2,
+    qa_status = $3,
+    qa_notes = $4,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateJobQAParams struct {
+	ID       uuid.UUID      `json:"id"`
+	QaScore  pgtype.Numeric `json:"qa_score"`
+	QaStatus *string        `json:"qa_status"`
+	QaNotes  *string        `json:"qa_notes"`
+}
+
+func (q *Queries) UpdateJobQA(ctx context.Context, arg UpdateJobQAParams) error {
+	_, err := q.db.Exec(ctx, updateJobQA,
+		arg.ID,
+		arg.QaScore,
+		arg.QaStatus,
+		arg.QaNotes,
+	)
+	return err
+}
+
 const updateJobStatus = `-- name: UpdateJobStatus :one
 UPDATE survey_jobs SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING id, parcel_id, subscription_id, user_id, survey_type, priority, deadline, trigger, status, assigned_agent_id, assigned_at, cascade_round, total_offers_sent, agent_arrived_at, survey_started_at, survey_submitted_at, completed_at, arrival_location, arrival_distance_m, base_payout, distance_bonus, urgency_bonus, total_payout, payout_status, landowner_rating, qa_score, qa_status, qa_notes, created_at, updated_at
 `

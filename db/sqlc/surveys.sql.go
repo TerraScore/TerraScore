@@ -208,6 +208,41 @@ func (q *Queries) GetSurveyResponseByJob(ctx context.Context, jobID uuid.UUID) (
 	return i, err
 }
 
+const listDuplicateHashesForParcel = `-- name: ListDuplicateHashesForParcel :many
+SELECT sm.file_hash_sha256, count(*) as hash_count
+FROM survey_media sm
+JOIN survey_jobs sj ON sm.job_id = sj.id
+WHERE sj.parcel_id = $1
+  AND sm.file_hash_sha256 != ''
+GROUP BY sm.file_hash_sha256
+HAVING count(*) > 1
+`
+
+type ListDuplicateHashesForParcelRow struct {
+	FileHashSha256 string `json:"file_hash_sha256"`
+	HashCount      int64  `json:"hash_count"`
+}
+
+func (q *Queries) ListDuplicateHashesForParcel(ctx context.Context, parcelID uuid.UUID) ([]ListDuplicateHashesForParcelRow, error) {
+	rows, err := q.db.Query(ctx, listDuplicateHashesForParcel, parcelID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDuplicateHashesForParcelRow{}
+	for rows.Next() {
+		var i ListDuplicateHashesForParcelRow
+		if err := rows.Scan(&i.FileHashSha256, &i.HashCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMediaByJob = `-- name: ListMediaByJob :many
 SELECT id, job_id, agent_id, step_id, media_type, s3_key, file_size_bytes, duration_sec, location, captured_at, file_hash_sha256, device_id, within_boundary, duplicate_hash, uploaded_at FROM survey_media WHERE job_id = $1 ORDER BY captured_at
 `

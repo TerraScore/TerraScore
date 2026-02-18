@@ -9,12 +9,13 @@ import (
 
 // Config holds all application configuration.
 type Config struct {
-	Server   ServerConfig
-	DB       DBConfig
-	Redis    RedisConfig
-	Keycloak KeycloakConfig
-	OTP      OTPConfig
-	AWS      AWSConfig
+	Server       ServerConfig
+	DB           DBConfig
+	Redis        RedisConfig
+	Keycloak     KeycloakConfig
+	OTP          OTPConfig
+	AWS          AWSConfig
+	Notification NotificationConfig
 }
 
 type ServerConfig struct {
@@ -70,6 +71,10 @@ type AWSConfig struct {
 	S3Endpoint string // Custom S3 endpoint for Hetzner/MinIO (leave empty for AWS)
 }
 
+type NotificationConfig struct {
+	Provider string // "mock" (default) or "fcm", "sendgrid", "msg91"
+}
+
 // LoadConfig reads configuration from environment variables.
 func LoadConfig() (*Config, error) {
 	v := viper.New()
@@ -113,6 +118,9 @@ func LoadConfig() (*Config, error) {
 	v.SetDefault("AWS_REGION", "ap-south-1")
 	v.SetDefault("AWS_S3_BUCKET", "landintel-media")
 
+	// Notification defaults
+	v.SetDefault("NOTIFICATION_PROVIDER", "mock")
+
 	cfg := &Config{
 		Server: ServerConfig{
 			Host: v.GetString("SERVER_HOST"),
@@ -151,6 +159,9 @@ func LoadConfig() (*Config, error) {
 			Region:     v.GetString("AWS_REGION"),
 			S3Bucket:   v.GetString("AWS_S3_BUCKET"),
 			S3Endpoint: v.GetString("AWS_S3_ENDPOINT"),
+		},
+		Notification: NotificationConfig{
+			Provider: v.GetString("NOTIFICATION_PROVIDER"),
 		},
 	}
 

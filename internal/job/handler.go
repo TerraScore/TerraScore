@@ -27,17 +27,19 @@ type Handler struct {
 	surveyRepo *survey.Repository
 	s3Client   *platform.S3Client
 	rdb        *redis.Client
+	eventBus   *platform.EventBus
 	logger     *slog.Logger
 }
 
 // NewHandler creates a job handler.
-func NewHandler(jobRepo *Repository, agentRepo *agent.Repository, surveyRepo *survey.Repository, s3Client *platform.S3Client, rdb *redis.Client, logger *slog.Logger) *Handler {
+func NewHandler(jobRepo *Repository, agentRepo *agent.Repository, surveyRepo *survey.Repository, s3Client *platform.S3Client, rdb *redis.Client, eventBus *platform.EventBus, logger *slog.Logger) *Handler {
 	return &Handler{
 		jobRepo:    jobRepo,
 		agentRepo:  agentRepo,
 		surveyRepo: surveyRepo,
 		s3Client:   s3Client,
 		rdb:        rdb,
+		eventBus:   eventBus,
 		logger:     logger,
 	}
 }
@@ -566,6 +568,16 @@ func (h *Handler) SubmitSurvey(w http.ResponseWriter, r *http.Request) {
 			"error", err,
 		)
 	}
+
+	// Publish event to trigger QA pipeline
+	h.eventBus.Publish(platform.Event{
+		Type: "survey.submitted",
+		Payload: map[string]string{
+			"job_id":    jobID.String(),
+			"parcel_id": job.ParcelID.String(),
+			"user_id":   job.UserID.String(),
+		},
+	})
 
 	h.logger.Info("survey submitted",
 		"agent_id", ag.ID,

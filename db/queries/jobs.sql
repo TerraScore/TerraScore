@@ -87,3 +87,11 @@ SELECT * FROM job_offers WHERE id = $1 AND status = 'sent';
 
 -- name: ExpireOffers :exec
 UPDATE job_offers SET status = 'expired' WHERE expires_at < NOW() AND status = 'sent';
+
+-- name: UpdateJobQA :exec
+UPDATE survey_jobs SET
+    qa_score = $2,
+    qa_status = $3,
+    qa_notes = $4,
+    updated_at = NOW()
+WHERE id = $1;

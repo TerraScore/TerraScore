@@ -135,6 +135,17 @@ type Parcel struct {
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Report struct {
+	ID          uuid.UUID `json:"id"`
+	ParcelID    uuid.UUID `json:"parcel_id"`
+	JobID       uuid.UUID `json:"job_id"`
+	S3Key       string    `json:"s3_key"`
+	ReportType  string    `json:"report_type"`
+	Format      string    `json:"format"`
+	GeneratedAt time.Time `json:"generated_at"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 type RiskScore struct {
 	ID                  uuid.UUID          `json:"id"`
 	ParcelID            uuid.UUID          `json:"parcel_id"`
