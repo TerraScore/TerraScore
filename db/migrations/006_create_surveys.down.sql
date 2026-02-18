@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS survey_media CASCADE;
+DROP TABLE IF EXISTS survey_responses CASCADE;
+DROP TABLE IF EXISTS checklist_templates CASCADE;

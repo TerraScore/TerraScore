@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS agent_payouts CASCADE;
+DROP TABLE IF EXISTS transactions CASCADE;
