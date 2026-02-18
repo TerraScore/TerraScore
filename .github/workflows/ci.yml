@@ -223,8 +223,8 @@ jobs:
               content: |
           EOF
 
-          # Append deploy key (indented for YAML block scalar)
-          echo "${{ secrets.GH_DEPLOY_KEY }}" | sed 's/^/            /' >> /tmp/cloud-init.yml
+          # Append deploy key (indented for YAML block scalar — 18 spaces so after 10-space strip it's 8)
+          echo "${{ secrets.GH_DEPLOY_KEY }}" | sed 's/^/                  /' >> /tmp/cloud-init.yml
 
           cat >> /tmp/cloud-init.yml << 'EOF'
             - path: /root/.ssh/config
@@ -241,8 +241,8 @@ jobs:
               content: |
           EOF
 
-          # Append env file contents (indented for YAML block scalar)
-          echo "$APP_ENV" | sed 's/^/            /' >> /tmp/cloud-init.yml
+          # Append env file contents (indented for YAML block scalar — 18 spaces so after 10-space strip it's 8)
+          echo "$APP_ENV" | sed 's/^/                  /' >> /tmp/cloud-init.yml
 
           # Append runcmd (uses variable expansion for REPO and BRANCH)
           cat >> /tmp/cloud-init.yml << RUNCMD_EOF
