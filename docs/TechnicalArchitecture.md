@@ -1970,8 +1970,8 @@ Team: 12-14 (+more engineering, sales, ops)
 |--------|--------|-----------------|
 | Sprint 1 | **COMPLETE** | Go skeleton, docker-compose (PG+Redis+Keycloak+Kong), 8 migrations, sqlc codegen, auth module (register/login/OTP/refresh), JWT middleware, CI pipeline |
 | Sprint 2 | **COMPLETE** | Land module (parcel CRUD, GeoJSON validation, India bbox, owner-scoped), Agent module (registration, profile, location hot path Redis→PostGIS flusher, FCM token, availability toggle) |
-| Sprint 3 | IN PROGRESS | Job allocation engine |
-| Sprint 4 | Not started | Agent mobile app (React Native) |
+| Sprint 3 | **COMPLETE** | Job allocation engine (matcher, dispatcher, cascade, scheduler, offer accept/decline, Redis pub/sub) |
+| Sprint 4 | **IN PROGRESS** | Agent mobile app backend (arrive geofence, S3 presigned upload, media metadata, survey submit, WebSocket offers) |
 | Sprint 5 | Not started | Landowner dashboard (Next.js) |
 | Sprint 6 | Not started | QA + Reports + Notifications + E2E |
 
@@ -1985,9 +1985,13 @@ internal/
     handler.go, service.go, repository.go, validation.go
   agent/                     — Sprint 2: Agent registration + profile + location
     handler.go, service.go, repository.go, location.go
-  job/                       — Sprint 3: Job allocation engine (planned)
-    doc.go (placeholder)
-  platform/                  — Shared infra: errors, httputil, eventbus, taskqueue, config, etc.
+  job/                       — Sprint 3: Job allocation engine + Sprint 4: agent endpoints
+    handler.go, repository.go, service.go, matcher.go, dispatcher.go, scheduler.go
+  survey/                    — Sprint 4: Survey response + media persistence
+    repository.go
+  ws/                        — Sprint 4: WebSocket handler for real-time agent offers
+    handler.go
+  platform/                  — Shared infra: errors, httputil, eventbus, taskqueue, config, s3, etc.
 db/
   migrations/                — 8 migration files (001-008)
   queries/                   — sqlc SQL (users, parcels, agents, jobs, surveys, alerts, billing, tasks)

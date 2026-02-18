@@ -18,6 +18,8 @@ import (
 	"github.com/terrascore/api/internal/job"
 	"github.com/terrascore/api/internal/land"
 	"github.com/terrascore/api/internal/platform"
+	"github.com/terrascore/api/internal/survey"
+	"github.com/terrascore/api/internal/ws"
 )
 
 func main() {
@@ -65,6 +67,13 @@ func run(ctx context.Context) error {
 	taskQueue := platform.NewTaskQueue(db, logger)
 	go taskQueue.Start(ctx)
 
+	// S3 client
+	s3Client, err := platform.NewS3Client(cfg.AWS)
+	if err != nil {
+		return fmt.Errorf("creating S3 client: %w", err)
+	}
+	logger.Info("initialized S3 client", "bucket", cfg.AWS.S3Bucket)
+
 	// Auth module
 	keycloakClient := auth.NewKeycloakClient(cfg.Keycloak)
 	otpService := auth.NewOTPService(rdb, cfg.OTP.Provider, cfg.OTP.AuthKey, logger)
@@ -84,13 +93,19 @@ func run(ctx context.Context) error {
 	locationFlusher := agent.NewLocationFlusher(rdb, agentRepo, logger)
 	go locationFlusher.Start(ctx)
 
+	// Survey module
+	surveyRepo := survey.NewRepository(db)
+
 	// Job module
 	jobRepo := job.NewRepository(db)
 	agentQueries := sqlc.New(db)
 	matcher := job.NewMatcher(agentQueries, jobRepo, logger)
 	dispatcher := job.NewDispatcher(matcher, jobRepo, rdb, eventBus, logger)
 	jobScheduler := job.NewScheduler(jobRepo, landRepo, eventBus, logger)
-	jobHandler := job.NewHandler(jobRepo, agentRepo, rdb, logger)
+	jobHandler := job.NewHandler(jobRepo, agentRepo, surveyRepo, s3Client, rdb, logger)
+
+	// WebSocket handler
+	wsHandler := ws.NewHandler(rdb, keycloakClient, agentRepo, logger)
 
 	// Subscribe dispatcher to job.created events
 	eventBus.Subscribe("job.created", dispatcher.HandleJobCreated)
@@ -112,6 +127,9 @@ func run(ctx context.Context) error {
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		platform.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
+
+	// WebSocket endpoint (outside /v1 prefix, no JWT middleware — auth via query param)
+	r.Get("/ws", wsHandler.ServeWS)
 
 	// API v1 routes
 	r.Route("/v1", func(r chi.Router) {
