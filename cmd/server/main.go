@@ -12,7 +12,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/terrascore/api/internal/agent"
 	"github.com/terrascore/api/internal/auth"
+	"github.com/terrascore/api/internal/land"
 	"github.com/terrascore/api/internal/platform"
 )
 
@@ -68,6 +70,18 @@ func run(ctx context.Context) error {
 	authService := auth.NewService(authRepo, keycloakClient, otpService, logger)
 	authHandler := auth.NewHandler(authService)
 
+	// Land module
+	landRepo := land.NewRepository(db)
+	landService := land.NewService(landRepo, authRepo, eventBus, logger)
+	landHandler := land.NewHandler(landService)
+
+	// Agent module
+	agentRepo := agent.NewRepository(db)
+	agentService := agent.NewService(agentRepo, rdb, keycloakClient, otpService, logger)
+	agentHandler := agent.NewHandler(agentService)
+	locationFlusher := agent.NewLocationFlusher(rdb, agentRepo, logger)
+	go locationFlusher.Start(ctx)
+
 	// Router
 	r := chi.NewRouter()
 
@@ -87,15 +101,14 @@ func run(ctx context.Context) error {
 	r.Route("/v1", func(r chi.Router) {
 		r.Mount("/auth", authHandler.Routes())
 
-		// Protected routes example (for future modules)
+		// Protected routes (JWT required)
 		r.Group(func(r chi.Router) {
 			r.Use(auth.JWTAuth(keycloakClient))
-			// Future module routes go here
+			r.Mount("/parcels", landHandler.Routes())
+			r.Mount("/agents", agentHandler.Routes())
 		})
 	})
 
-	// Keep references for future use
-	_ = eventBus
 	_ = taskQueue
 
 	// Start server

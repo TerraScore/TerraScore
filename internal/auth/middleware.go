@@ -27,6 +27,11 @@ func GetUser(ctx context.Context) *UserContext {
 	return nil
 }
 
+// SetUser injects a UserContext into the context. For testing only.
+func SetUser(ctx context.Context, user *UserContext) context.Context {
+	return context.WithValue(ctx, userContextKey{}, user)
+}
+
 // JWTAuth middleware validates the Keycloak JWT and injects UserContext.
 func JWTAuth(kc *KeycloakClient) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
