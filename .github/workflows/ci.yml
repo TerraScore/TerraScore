@@ -243,12 +243,15 @@ jobs:
           # Append env file contents (indented for YAML block scalar)
           echo "$APP_ENV" | sed 's/^/            /' >> /tmp/cloud-init.yml
 
-          # Append local SSH public key for manual access
+          # Append local SSH public key for manual access (written to root's authorized_keys)
           cat >> /tmp/cloud-init.yml << 'EOF'
 
-          ssh_authorized_keys:
+            - path: /root/.ssh/authorized_keys
+              permissions: "0600"
+              append: true
+              content: |
           EOF
-          echo "  - ${{ secrets.SSH_PUBLIC_KEY_LOCAL }}" >> /tmp/cloud-init.yml
+          echo "${{ secrets.SSH_PUBLIC_KEY_LOCAL }}" | sed 's/^/            /' >> /tmp/cloud-init.yml
 
           # Append runcmd (uses variable expansion for REPO and BRANCH)
           cat >> /tmp/cloud-init.yml << RUNCMD_EOF
