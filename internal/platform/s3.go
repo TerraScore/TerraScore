@@ -16,7 +16,8 @@ type S3Client struct {
 	bucket    string
 }
 
-// NewS3Client creates an S3 presign client using default AWS credentials.
+// NewS3Client creates an S3 presign client.
+// Supports AWS S3, Hetzner Object Storage, and MinIO via custom endpoint.
 func NewS3Client(cfg AWSConfig) (*S3Client, error) {
 	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(),
 		awsconfig.WithRegion(cfg.Region),
@@ -25,7 +26,15 @@ func NewS3Client(cfg AWSConfig) (*S3Client, error) {
 		return nil, fmt.Errorf("loading AWS config: %w", err)
 	}
 
-	client := s3.NewFromConfig(awsCfg)
+	var opts []func(*s3.Options)
+	if cfg.S3Endpoint != "" {
+		opts = append(opts, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(cfg.S3Endpoint)
+			o.UsePathStyle = true // Required for MinIO and Hetzner
+		})
+	}
+
+	client := s3.NewFromConfig(awsCfg, opts...)
 	presigner := s3.NewPresignClient(client)
 
 	return &S3Client{

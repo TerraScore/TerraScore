@@ -65,8 +65,9 @@ type OTPConfig struct {
 }
 
 type AWSConfig struct {
-	Region   string
-	S3Bucket string
+	Region     string
+	S3Bucket   string
+	S3Endpoint string // Custom S3 endpoint for Hetzner/MinIO (leave empty for AWS)
 }
 
 // LoadConfig reads configuration from environment variables.
@@ -147,8 +148,9 @@ func LoadConfig() (*Config, error) {
 			SendOTPURL: v.GetString("OTP_SEND_URL"),
 		},
 		AWS: AWSConfig{
-			Region:   v.GetString("AWS_REGION"),
-			S3Bucket: v.GetString("AWS_S3_BUCKET"),
+			Region:     v.GetString("AWS_REGION"),
+			S3Bucket:   v.GetString("AWS_S3_BUCKET"),
+			S3Endpoint: v.GetString("AWS_S3_ENDPOINT"),
 		},
 	}
 
