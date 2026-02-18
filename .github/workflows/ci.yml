@@ -2,9 +2,21 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      deploy_action:
+        description: "Deploy action"
+        required: true
+        default: create
+        type: choice
+        options:
+          - create
+          - recreate
+          - delete
+          - ignore
 
 jobs:
   test-backend:
@@ -98,47 +110,193 @@ jobs:
         working-directory: web
         run: npm run build
 
-  docker:
+  deploy:
     runs-on: ubuntu-latest
     needs: [test-backend, build-web]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    permissions:
-      contents: read
-      packages: write
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    concurrency:
+      group: deploy-${{ github.ref_name }}
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: docker
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Deploy placeholder
+      - name: Install hcloud CLI
         run: |
-          echo "Deploy step — configure for your environment"
-          # aws ecs update-service \
-          #   --cluster landintel-prod \
-          #   --service landintel-api \
-          #   --force-new-deployment \
-          #   --region ap-south-1
+          curl -sL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz | tar xz
+          sudo mv hcloud /usr/local/bin/
+
+      - name: Determine environment and action
+        id: env
+        run: |
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "env=prod" >> "$GITHUB_OUTPUT"
+            echo "server_name=landintel-prod" >> "$GITHUB_OUTPUT"
+            echo "app_env_secret=APP_ENV_PROD" >> "$GITHUB_OUTPUT"
+          else
+            echo "env=staging" >> "$GITHUB_OUTPUT"
+            echo "server_name=landintel-staging" >> "$GITHUB_OUTPUT"
+            echo "app_env_secret=APP_ENV_STAGING" >> "$GITHUB_OUTPUT"
+          fi
+
+          ACTION="${{ github.event.inputs.deploy_action || 'create' }}"
+          echo "action=$ACTION" >> "$GITHUB_OUTPUT"
+          echo "branch=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if ignore
+        if: steps.env.outputs.action == 'ignore'
+        run: echo "Deploy action is ignore — skipping deployment."
+
+      - name: Setup SSH key
+        if: steps.env.outputs.action != 'ignore'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Ensure SSH key in Hetzner
+        if: steps.env.outputs.action != 'ignore'
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+        run: |
+          if ! hcloud ssh-key describe landintel-ci &>/dev/null; then
+            PUBLIC_KEY=$(ssh-keygen -y -f ~/.ssh/id_ed25519)
+            hcloud ssh-key create --name landintel-ci --public-key "$PUBLIC_KEY"
+          fi
+
+      - name: Check if server exists
+        if: steps.env.outputs.action != 'ignore'
+        id: server
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+        run: |
+          SERVER_NAME="${{ steps.env.outputs.server_name }}"
+          if hcloud server describe "$SERVER_NAME" &>/dev/null; then
+            IP=$(hcloud server ip "$SERVER_NAME")
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "ip=$IP" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Delete server (recreate/delete)
+        if: >
+          steps.env.outputs.action == 'delete' ||
+          (steps.env.outputs.action == 'recreate' && steps.server.outputs.exists == 'true')
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+        run: |
+          echo "Deleting server ${{ steps.env.outputs.server_name }}..."
+          hcloud server delete "${{ steps.env.outputs.server_name }}"
+          echo "Server deleted."
+
+      - name: Generate cloud-init user-data
+        if: >
+          steps.env.outputs.action == 'create' && steps.server.outputs.exists != 'true' ||
+          steps.env.outputs.action == 'recreate'
+        run: |
+          if [[ "${{ steps.env.outputs.env }}" == "prod" ]]; then
+            APP_ENV="${{ secrets.APP_ENV_PROD }}"
+          else
+            APP_ENV="${{ secrets.APP_ENV_STAGING }}"
+          fi
+
+          REPO="${{ github.repository }}"
+          BRANCH="${{ steps.env.outputs.branch }}"
+
+          # Write cloud-init header
+          cat > /tmp/cloud-init.yml << 'EOF'
+          #cloud-config
+          package_update: true
+          package_upgrade: true
+
+          packages:
+            - git
+            - curl
+            - ca-certificates
+
+          write_files:
+            - path: /root/.ssh/deploy_key
+              permissions: "0600"
+              content: |
+          EOF
+
+          # Append deploy key (indented for YAML block scalar)
+          echo "${{ secrets.GH_DEPLOY_KEY }}" | sed 's/^/            /' >> /tmp/cloud-init.yml
+
+          cat >> /tmp/cloud-init.yml << 'EOF'
+            - path: /root/.ssh/config
+              permissions: "0644"
+              content: |
+                Host github.com
+                  HostName github.com
+                  User git
+                  IdentityFile /root/.ssh/deploy_key
+                  StrictHostKeyChecking no
+
+            - path: /opt/landintel/.env
+              permissions: "0600"
+              content: |
+          EOF
+
+          # Append env file contents (indented for YAML block scalar)
+          echo "$APP_ENV" | sed 's/^/            /' >> /tmp/cloud-init.yml
+
+          # Append runcmd (uses variable expansion for REPO and BRANCH)
+          cat >> /tmp/cloud-init.yml << RUNCMD_EOF
+
+          runcmd:
+            - |
+              curl -fsSL https://get.docker.com | sh
+              git clone -b ${BRANCH} git@github.com:${REPO}.git /opt/landintel/repo
+              export BRANCH=${BRANCH}
+              bash /opt/landintel/repo/infra/deploy/setup.sh
+          RUNCMD_EOF
+
+          # Strip leading whitespace from heredoc (cloud-init needs no leading spaces)
+          sed -i 's/^          //' /tmp/cloud-init.yml
+
+      - name: Create server
+        if: >
+          steps.env.outputs.action == 'create' && steps.server.outputs.exists != 'true' ||
+          steps.env.outputs.action == 'recreate'
+        id: create
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+        run: |
+          echo "Creating server ${{ steps.env.outputs.server_name }}..."
+          hcloud server create \
+            --name "${{ steps.env.outputs.server_name }}" \
+            --type cx32 \
+            --image ubuntu-24.04 \
+            --ssh-key landintel-ci \
+            --user-data-from-file /tmp/cloud-init.yml \
+            --location fsn1
+
+          # Wait for server to get IP
+          sleep 5
+          IP=$(hcloud server ip "${{ steps.env.outputs.server_name }}")
+          echo "ip=$IP" >> "$GITHUB_OUTPUT"
+          echo "Server created at $IP"
+
+      - name: SSH update (existing server)
+        if: steps.env.outputs.action == 'create' && steps.server.outputs.exists == 'true'
+        run: |
+          IP="${{ steps.server.outputs.ip }}"
+          echo "Updating existing server at $IP..."
+          ssh-keyscan -H "$IP" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -o StrictHostKeyChecking=no root@"$IP" 'FORCE=1 /opt/landintel/repo/infra/deploy/update.sh'
+          echo "Update complete."
+
+      - name: Print server info
+        if: steps.env.outputs.action != 'ignore' && steps.env.outputs.action != 'delete'
+        run: |
+          IP="${{ steps.create.outputs.ip || steps.server.outputs.ip }}"
+          echo "========================================="
+          echo "  Environment: ${{ steps.env.outputs.env }}"
+          echo "  Server:      ${{ steps.env.outputs.server_name }}"
+          echo "  IP:          $IP"
+          echo "  API:         http://$IP:8080/health"
+          echo "  Web:         http://$IP:3000"
+          echo "========================================="
