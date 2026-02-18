@@ -13,8 +13,12 @@ import (
 	"github.com/terrascore/api/internal/platform"
 )
 
+func newTestHandler() *Handler {
+	return &Handler{}
+}
+
 func TestAcceptOffer_NoAuth(t *testing.T) {
-	h := &Handler{}
+	h := newTestHandler()
 	r := chi.NewRouter()
 	r.Post("/jobs/{id}/accept", h.AcceptOffer)
 
@@ -28,7 +32,7 @@ func TestAcceptOffer_NoAuth(t *testing.T) {
 }
 
 func TestDeclineOffer_NoAuth(t *testing.T) {
-	h := &Handler{}
+	h := newTestHandler()
 	r := chi.NewRouter()
 	r.Post("/jobs/{id}/decline", h.DeclineOffer)
 
@@ -42,7 +46,7 @@ func TestDeclineOffer_NoAuth(t *testing.T) {
 }
 
 func TestAcceptOffer_InvalidJobID(t *testing.T) {
-	h := &Handler{}
+	h := newTestHandler()
 	r := chi.NewRouter()
 	r.Post("/jobs/{id}/accept", h.AcceptOffer)
 
@@ -61,7 +65,7 @@ func TestAcceptOffer_InvalidJobID(t *testing.T) {
 }
 
 func TestDeclineOffer_InvalidJobID(t *testing.T) {
-	h := &Handler{}
+	h := newTestHandler()
 	r := chi.NewRouter()
 	r.Post("/jobs/{id}/decline", h.DeclineOffer)
 
@@ -80,7 +84,7 @@ func TestDeclineOffer_InvalidJobID(t *testing.T) {
 }
 
 func TestGetJob_NoAuth(t *testing.T) {
-	h := &Handler{}
+	h := newTestHandler()
 	r := chi.NewRouter()
 	r.Get("/jobs/{id}", h.GetJob)
 
@@ -94,7 +98,7 @@ func TestGetJob_NoAuth(t *testing.T) {
 }
 
 func TestListAgentJobs_NoAuth(t *testing.T) {
-	h := &Handler{}
+	h := newTestHandler()
 	r := chi.NewRouter()
 	r.Get("/agents/me/jobs", h.ListAgentJobs)
 
@@ -108,7 +112,7 @@ func TestListAgentJobs_NoAuth(t *testing.T) {
 }
 
 func TestListAgentOffers_NoAuth(t *testing.T) {
-	h := &Handler{}
+	h := newTestHandler()
 	r := chi.NewRouter()
 	r.Get("/agents/me/offers", h.ListAgentOffers)
 
@@ -118,6 +122,158 @@ func TestListAgentOffers_NoAuth(t *testing.T) {
 
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestArrive_NoAuth(t *testing.T) {
+	h := newTestHandler()
+	r := chi.NewRouter()
+	r.Post("/jobs/{id}/arrive", h.Arrive)
+
+	req := httptest.NewRequest(http.MethodPost, "/jobs/00000000-0000-0000-0000-000000000001/arrive", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestArrive_InvalidJobID(t *testing.T) {
+	h := newTestHandler()
+	r := chi.NewRouter()
+	r.Post("/jobs/{id}/arrive", h.Arrive)
+
+	ctx := auth.SetUser(context.Background(), &auth.UserContext{
+		KeycloakID: "test-kc-id",
+		Roles:      []string{"agent"},
+	})
+
+	body := `{"lat": 12.97, "lng": 77.59}`
+	req := httptest.NewRequest(http.MethodPost, "/jobs/not-a-uuid/arrive", bytes.NewBufferString(body)).WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestPresignedURL_NoAuth(t *testing.T) {
+	h := newTestHandler()
+	r := chi.NewRouter()
+	r.Get("/jobs/{id}/media/presigned", h.PresignedURL)
+
+	req := httptest.NewRequest(http.MethodGet, "/jobs/00000000-0000-0000-0000-000000000001/media/presigned", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestPresignedURL_MissingParams(t *testing.T) {
+	h := newTestHandler()
+	r := chi.NewRouter()
+	r.Get("/jobs/{id}/media/presigned", h.PresignedURL)
+
+	ctx := auth.SetUser(context.Background(), &auth.UserContext{
+		KeycloakID: "test-kc-id",
+		Roles:      []string{"agent"},
+	})
+
+	// Missing content_type and step_id
+	req := httptest.NewRequest(http.MethodGet, "/jobs/00000000-0000-0000-0000-000000000001/media/presigned", nil).WithContext(ctx)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for missing params, got %d", w.Code)
+	}
+}
+
+func TestRecordMedia_NoAuth(t *testing.T) {
+	h := newTestHandler()
+	r := chi.NewRouter()
+	r.Post("/jobs/{id}/media", h.RecordMedia)
+
+	req := httptest.NewRequest(http.MethodPost, "/jobs/00000000-0000-0000-0000-000000000001/media", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestSubmitSurvey_NoAuth(t *testing.T) {
+	h := newTestHandler()
+	r := chi.NewRouter()
+	r.Post("/jobs/{id}/survey", h.SubmitSurvey)
+
+	req := httptest.NewRequest(http.MethodPost, "/jobs/00000000-0000-0000-0000-000000000001/survey", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestSubmitSurvey_InvalidJobID(t *testing.T) {
+	h := newTestHandler()
+	r := chi.NewRouter()
+	r.Post("/jobs/{id}/survey", h.SubmitSurvey)
+
+	ctx := auth.SetUser(context.Background(), &auth.UserContext{
+		KeycloakID: "test-kc-id",
+		Roles:      []string{"agent"},
+	})
+
+	body := `{"responses": {"q1": "yes"}}`
+	req := httptest.NewRequest(http.MethodPost, "/jobs/not-a-uuid/survey", bytes.NewBufferString(body)).WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestGetTemplate_NoAuth(t *testing.T) {
+	h := newTestHandler()
+	r := chi.NewRouter()
+	r.Get("/jobs/{id}/template", h.GetTemplate)
+
+	req := httptest.NewRequest(http.MethodGet, "/jobs/00000000-0000-0000-0000-000000000001/template", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestExtensionFromContentType(t *testing.T) {
+	tests := []struct {
+		contentType string
+		want        string
+	}{
+		{"image/jpeg", "jpg"},
+		{"image/png", "png"},
+		{"video/mp4", "mp4"},
+		{"audio/aac", "aac"},
+		{"application/octet-stream", "octet-stream"},
+	}
+
+	for _, tt := range tests {
+		got := extensionFromContentType(tt.contentType)
+		if got != tt.want {
+			t.Errorf("extensionFromContentType(%q) = %q, want %q", tt.contentType, got, tt.want)
+		}
 	}
 }
 

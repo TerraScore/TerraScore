@@ -160,6 +160,34 @@ func (r *Repository) ListPendingOffersByAgent(ctx context.Context, agentID uuid.
 	return offers, nil
 }
 
+// DistanceToParcelCentroid calculates the distance in meters between a point and the parcel's centroid.
+func (r *Repository) DistanceToParcelCentroid(ctx context.Context, parcelID uuid.UUID, lng, lat float64) (float64, error) {
+	var distM float64
+	err := r.db.QueryRow(ctx,
+		`SELECT ST_Distance(
+			centroid::geography,
+			ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
+		) FROM parcels WHERE id = $1`,
+		parcelID, lng, lat,
+	).Scan(&distM)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return 0, platform.NewNotFound("parcel not found")
+		}
+		return 0, fmt.Errorf("calculating distance to parcel centroid: %w", err)
+	}
+	return distM, nil
+}
+
+// RecordAgentArrival records the agent's arrival at the parcel.
+func (r *Repository) RecordAgentArrival(ctx context.Context, params sqlc.RecordAgentArrivalParams) error {
+	err := r.q.RecordAgentArrival(ctx, params)
+	if err != nil {
+		return fmt.Errorf("recording agent arrival: %w", err)
+	}
+	return nil
+}
+
 // ExpireOffers bulk-expires all offers past their deadline.
 func (r *Repository) ExpireOffers(ctx context.Context) error {
 	err := r.q.ExpireOffers(ctx)

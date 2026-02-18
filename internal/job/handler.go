@@ -3,31 +3,42 @@ package job
 import (
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
+	"github.com/terrascore/api/db/sqlc"
 	"github.com/terrascore/api/internal/agent"
 	"github.com/terrascore/api/internal/auth"
 	"github.com/terrascore/api/internal/platform"
+	"github.com/terrascore/api/internal/survey"
 )
 
 // Handler handles job HTTP endpoints.
 type Handler struct {
-	jobRepo   *Repository
-	agentRepo *agent.Repository
-	rdb       *redis.Client
-	logger    *slog.Logger
+	jobRepo    *Repository
+	agentRepo  *agent.Repository
+	surveyRepo *survey.Repository
+	s3Client   *platform.S3Client
+	rdb        *redis.Client
+	logger     *slog.Logger
 }
 
 // NewHandler creates a job handler.
-func NewHandler(jobRepo *Repository, agentRepo *agent.Repository, rdb *redis.Client, logger *slog.Logger) *Handler {
+func NewHandler(jobRepo *Repository, agentRepo *agent.Repository, surveyRepo *survey.Repository, s3Client *platform.S3Client, rdb *redis.Client, logger *slog.Logger) *Handler {
 	return &Handler{
-		jobRepo:   jobRepo,
-		agentRepo: agentRepo,
-		rdb:       rdb,
-		logger:    logger,
+		jobRepo:    jobRepo,
+		agentRepo:  agentRepo,
+		surveyRepo: surveyRepo,
+		s3Client:   s3Client,
+		rdb:        rdb,
+		logger:     logger,
 	}
 }
 
@@ -41,6 +52,11 @@ func (h *Handler) Routes() chi.Router {
 		r.Post("/{id}/accept", h.AcceptOffer)
 		r.Post("/{id}/decline", h.DeclineOffer)
 		r.Get("/{id}", h.GetJob)
+		r.Post("/{id}/arrive", h.Arrive)
+		r.Get("/{id}/media/presigned", h.PresignedURL)
+		r.Post("/{id}/media", h.RecordMedia)
+		r.Post("/{id}/survey", h.SubmitSurvey)
+		r.Get("/{id}/template", h.GetTemplate)
 	})
 
 	return r
@@ -261,4 +277,367 @@ func (h *Handler) ListAgentOffers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	platform.JSON(w, http.StatusOK, result)
+}
+
+// Arrive handles POST /v1/jobs/{id}/arrive.
+// Validates geofence (agent must be within 500m of parcel centroid).
+func (h *Handler) Arrive(w http.ResponseWriter, r *http.Request) {
+	userCtx := auth.GetUser(r.Context())
+	if userCtx == nil {
+		platform.JSONError(w, http.StatusUnauthorized, platform.CodeUnauthorized, "not authenticated")
+		return
+	}
+
+	jobID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		platform.HandleError(w, platform.NewBadRequest("invalid job ID"))
+		return
+	}
+
+	var req ArriveRequest
+	if err := platform.Decode(r, &req); err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	if req.Lat == 0 && req.Lng == 0 {
+		platform.HandleError(w, platform.NewBadRequest("lat and lng are required"))
+		return
+	}
+
+	// Resolve agent
+	ag, err := h.agentRepo.GetAgentByKeycloakID(r.Context(), userCtx.KeycloakID)
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	// Verify job exists and is assigned to this agent
+	job, err := h.jobRepo.GetJobByID(r.Context(), jobID)
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	if !job.AssignedAgentID.Valid || uuid.UUID(job.AssignedAgentID.Bytes) != ag.ID {
+		platform.HandleError(w, platform.NewForbidden("job not assigned to you"))
+		return
+	}
+
+	if job.Status == nil || *job.Status != "assigned" {
+		platform.HandleError(w, platform.NewBadRequest("job is not in assigned status"))
+		return
+	}
+
+	// Geofence check: distance from agent to parcel centroid
+	distM, err := h.jobRepo.DistanceToParcelCentroid(r.Context(), job.ParcelID, req.Lng, req.Lat)
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	const maxDistanceM = 500.0
+	if distM > maxDistanceM {
+		platform.HandleError(w, platform.NewBadRequest(
+			fmt.Sprintf("too far from parcel (%.0fm away, max %0.fm)", distM, maxDistanceM),
+		))
+		return
+	}
+
+	arrivalDist := float32(math.Round(distM*100) / 100)
+	err = h.jobRepo.RecordAgentArrival(r.Context(), sqlc.RecordAgentArrivalParams{
+		ID:               jobID,
+		StMakepoint:      req.Lng,
+		StMakepoint_2:    req.Lat,
+		ArrivalDistanceM: &arrivalDist,
+	})
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("agent arrived at parcel",
+		"agent_id", ag.ID,
+		"job_id", jobID,
+		"distance_m", distM,
+	)
+
+	platform.JSON(w, http.StatusOK, map[string]any{
+		"message":    "arrival confirmed",
+		"distance_m": math.Round(distM*100) / 100,
+	})
+}
+
+// PresignedURL handles GET /v1/jobs/{id}/media/presigned.
+// Query params: content_type, step_id.
+func (h *Handler) PresignedURL(w http.ResponseWriter, r *http.Request) {
+	userCtx := auth.GetUser(r.Context())
+	if userCtx == nil {
+		platform.JSONError(w, http.StatusUnauthorized, platform.CodeUnauthorized, "not authenticated")
+		return
+	}
+
+	jobID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		platform.HandleError(w, platform.NewBadRequest("invalid job ID"))
+		return
+	}
+
+	contentType := r.URL.Query().Get("content_type")
+	stepID := r.URL.Query().Get("step_id")
+	if contentType == "" || stepID == "" {
+		platform.HandleError(w, platform.NewBadRequest("content_type and step_id query params are required"))
+		return
+	}
+
+	// Determine file extension from content type
+	ext := extensionFromContentType(contentType)
+
+	// Build S3 key: media/{job_id}/{step_id}/{uuid}.{ext}
+	s3Key := fmt.Sprintf("media/%s/%s/%s.%s", jobID, stepID, uuid.New(), ext)
+
+	ttl := 15 * time.Minute
+	url, err := h.s3Client.GeneratePresignedPutURL(r.Context(), s3Key, contentType, ttl)
+	if err != nil {
+		h.logger.Error("failed to generate presigned URL", "error", err)
+		platform.HandleError(w, platform.NewInternal("failed to generate upload URL", err))
+		return
+	}
+
+	platform.JSON(w, http.StatusOK, PresignedURLResponse{
+		UploadURL: url,
+		S3Key:     s3Key,
+		ExpiresIn: int(ttl.Seconds()),
+	})
+}
+
+// RecordMedia handles POST /v1/jobs/{id}/media.
+// Records media metadata after a successful S3 upload.
+func (h *Handler) RecordMedia(w http.ResponseWriter, r *http.Request) {
+	userCtx := auth.GetUser(r.Context())
+	if userCtx == nil {
+		platform.JSONError(w, http.StatusUnauthorized, platform.CodeUnauthorized, "not authenticated")
+		return
+	}
+
+	jobID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		platform.HandleError(w, platform.NewBadRequest("invalid job ID"))
+		return
+	}
+
+	var req MediaRequest
+	if err := platform.Decode(r, &req); err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	if req.S3Key == "" || req.StepID == "" || req.MediaType == "" || req.SHA256 == "" {
+		platform.HandleError(w, platform.NewBadRequest("s3_key, step_id, media_type, and sha256 are required"))
+		return
+	}
+
+	// Resolve agent
+	ag, err := h.agentRepo.GetAgentByKeycloakID(r.Context(), userCtx.KeycloakID)
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	media, err := h.surveyRepo.CreateSurveyMedia(r.Context(), sqlc.CreateSurveyMediaParams{
+		JobID:          jobID,
+		AgentID:        ag.ID,
+		StepID:         req.StepID,
+		MediaType:      req.MediaType,
+		S3Key:          req.S3Key,
+		FileSizeBytes:  req.FileSize,
+		StMakepoint:    req.Lng,
+		StMakepoint_2:  req.Lat,
+		CapturedAt:     req.CapturedAt,
+		FileHashSha256: req.SHA256,
+	})
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("media metadata recorded",
+		"agent_id", ag.ID,
+		"job_id", jobID,
+		"media_id", media.ID,
+		"step_id", req.StepID,
+	)
+
+	platform.JSON(w, http.StatusCreated, MediaResponse{
+		ID:        media.ID,
+		S3Key:     media.S3Key,
+		StepID:    media.StepID,
+		MediaType: media.MediaType,
+		UploadedAt: func() time.Time {
+			if media.UploadedAt.Valid {
+				return media.UploadedAt.Time
+			}
+			return time.Now()
+		}(),
+	})
+}
+
+// SubmitSurvey handles POST /v1/jobs/{id}/survey.
+// Submits the survey response and updates job status to survey_submitted.
+func (h *Handler) SubmitSurvey(w http.ResponseWriter, r *http.Request) {
+	userCtx := auth.GetUser(r.Context())
+	if userCtx == nil {
+		platform.JSONError(w, http.StatusUnauthorized, platform.CodeUnauthorized, "not authenticated")
+		return
+	}
+
+	jobID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		platform.HandleError(w, platform.NewBadRequest("invalid job ID"))
+		return
+	}
+
+	var req SurveySubmitRequest
+	if err := platform.Decode(r, &req); err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	if req.Responses == nil {
+		platform.HandleError(w, platform.NewBadRequest("responses field is required"))
+		return
+	}
+
+	// Resolve agent
+	ag, err := h.agentRepo.GetAgentByKeycloakID(r.Context(), userCtx.KeycloakID)
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	// Verify job is assigned to this agent
+	job, err := h.jobRepo.GetJobByID(r.Context(), jobID)
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	if !job.AssignedAgentID.Valid || uuid.UUID(job.AssignedAgentID.Bytes) != ag.ID {
+		platform.HandleError(w, platform.NewForbidden("job not assigned to you"))
+		return
+	}
+
+	// Build params
+	params := sqlc.CreateSurveyResponseParams{
+		JobID:     jobID,
+		AgentID:   ag.ID,
+		Responses: req.Responses,
+	}
+
+	if req.TemplateID != nil {
+		params.TemplateID = pgtype.UUID{Bytes: *req.TemplateID, Valid: true}
+	}
+
+	if req.GPSTrailGeoJSON != "" {
+		params.StGeomfromgeojson = req.GPSTrailGeoJSON
+	}
+
+	if req.DeviceInfo != nil {
+		params.DeviceInfo = req.DeviceInfo
+	}
+
+	if req.StartedAt != nil {
+		params.StartedAt = pgtype.Timestamptz{Time: *req.StartedAt, Valid: true}
+	}
+
+	params.DurationMinutes = req.DurationMinutes
+
+	surveyResp, err := h.surveyRepo.CreateSurveyResponse(r.Context(), params)
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	// Update job status to survey_submitted
+	_, err = h.jobRepo.UpdateJobStatus(r.Context(), jobID, "survey_submitted")
+	if err != nil {
+		h.logger.Error("failed to update job status after survey submit",
+			"job_id", jobID,
+			"error", err,
+		)
+	}
+
+	h.logger.Info("survey submitted",
+		"agent_id", ag.ID,
+		"job_id", jobID,
+		"survey_response_id", surveyResp.ID,
+	)
+
+	platform.JSON(w, http.StatusOK, map[string]any{
+		"message":            "survey submitted",
+		"survey_response_id": surveyResp.ID,
+	})
+}
+
+// GetTemplate handles GET /v1/jobs/{id}/template.
+// Returns the active checklist template for the job's survey type.
+func (h *Handler) GetTemplate(w http.ResponseWriter, r *http.Request) {
+	userCtx := auth.GetUser(r.Context())
+	if userCtx == nil {
+		platform.JSONError(w, http.StatusUnauthorized, platform.CodeUnauthorized, "not authenticated")
+		return
+	}
+
+	jobID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		platform.HandleError(w, platform.NewBadRequest("invalid job ID"))
+		return
+	}
+
+	job, err := h.jobRepo.GetJobByID(r.Context(), jobID)
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	tmpl, err := h.surveyRepo.GetActiveTemplate(r.Context(), job.SurveyType)
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	platform.JSON(w, http.StatusOK, TemplateResponse{
+		ID:         tmpl.ID,
+		Name:       tmpl.Name,
+		SurveyType: tmpl.SurveyType,
+		Version:    tmpl.Version,
+		Steps:      tmpl.Steps,
+	})
+}
+
+// extensionFromContentType maps common content types to file extensions.
+func extensionFromContentType(ct string) string {
+	switch strings.ToLower(ct) {
+	case "image/jpeg":
+		return "jpg"
+	case "image/png":
+		return "png"
+	case "image/webp":
+		return "webp"
+	case "video/mp4":
+		return "mp4"
+	case "video/quicktime":
+		return "mov"
+	case "audio/aac":
+		return "aac"
+	case "audio/mpeg":
+		return "mp3"
+	default:
+		// Try to extract from content type
+		parts := strings.Split(ct, "/")
+		if len(parts) == 2 {
+			return filepath.Base(parts[1])
+		}
+		return "bin"
+	}
 }

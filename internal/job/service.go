@@ -1,6 +1,7 @@
 package job
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,6 +38,61 @@ type OfferResponse struct {
 // DeclineRequest is the payload for declining a job offer.
 type DeclineRequest struct {
 	Reason string `json:"reason,omitempty"`
+}
+
+// ArriveRequest is the payload for agent arrival confirmation.
+type ArriveRequest struct {
+	Lat      float64 `json:"lat"`
+	Lng      float64 `json:"lng"`
+	Accuracy float64 `json:"accuracy,omitempty"`
+}
+
+// PresignedURLResponse is the response for presigned URL generation.
+type PresignedURLResponse struct {
+	UploadURL string `json:"upload_url"`
+	S3Key     string `json:"s3_key"`
+	ExpiresIn int    `json:"expires_in"`
+}
+
+// MediaRequest is the payload for recording media metadata after S3 upload.
+type MediaRequest struct {
+	S3Key      string    `json:"s3_key"`
+	StepID     string    `json:"step_id"`
+	MediaType  string    `json:"media_type"`
+	Lat        float64   `json:"lat"`
+	Lng        float64   `json:"lng"`
+	Accuracy   float64   `json:"accuracy,omitempty"`
+	SHA256     string    `json:"sha256"`
+	FileSize   *int64    `json:"file_size,omitempty"`
+	CapturedAt time.Time `json:"captured_at"`
+}
+
+// MediaResponse is the API representation of a survey media record.
+type MediaResponse struct {
+	ID        uuid.UUID `json:"id"`
+	S3Key     string    `json:"s3_key"`
+	StepID    string    `json:"step_id"`
+	MediaType string    `json:"media_type"`
+	UploadedAt time.Time `json:"uploaded_at"`
+}
+
+// SurveySubmitRequest is the payload for submitting a survey.
+type SurveySubmitRequest struct {
+	Responses       json.RawMessage `json:"responses"`
+	GPSTrailGeoJSON string          `json:"gps_trail_geojson"`
+	DeviceInfo      json.RawMessage `json:"device_info,omitempty"`
+	StartedAt       *time.Time      `json:"started_at,omitempty"`
+	DurationMinutes *float32        `json:"duration_minutes,omitempty"`
+	TemplateID      *uuid.UUID      `json:"template_id,omitempty"`
+}
+
+// TemplateResponse is the API representation of a checklist template.
+type TemplateResponse struct {
+	ID         uuid.UUID       `json:"id"`
+	Name       string          `json:"name"`
+	SurveyType string          `json:"survey_type"`
+	Version    *int32          `json:"version,omitempty"`
+	Steps      json.RawMessage `json:"steps"`
 }
 
 // JobResponseFromSqlc maps sqlc.SurveyJob fields to JobResponse.
