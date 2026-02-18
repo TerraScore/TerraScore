@@ -28,5 +28,14 @@ LIMIT $1;
 -- name: UpdateParcelStatus :exec
 UPDATE parcels SET status = $2, updated_at = NOW() WHERE id = $1;
 
+-- name: GetParcelWithGeoJSON :one
+SELECT id, user_id, label, survey_number, village, taluk, district, state, state_code, pin_code,
+    ST_AsGeoJSON(boundary) AS boundary_geojson, centroid, area_sqm, land_type,
+    registered_area_sqm, title_deed_s3_key, status, monitoring_since, created_at, updated_at
+FROM parcels WHERE id = $1;
+
+-- name: UpdateParcelBoundary :exec
+UPDATE parcels SET boundary = ST_GeomFromGeoJSON($2), updated_at = NOW() WHERE id = $1;
+
 -- name: DeleteParcel :exec
 UPDATE parcels SET status = 'deleted', updated_at = NOW() WHERE id = $1;

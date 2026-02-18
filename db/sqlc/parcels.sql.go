@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const countParcelsByUser = `-- name: CountParcelsByUser :one
@@ -179,6 +180,64 @@ func (q *Queries) GetParcelByID(ctx context.Context, id uuid.UUID) (Parcel, erro
 	return i, err
 }
 
+const getParcelWithGeoJSON = `-- name: GetParcelWithGeoJSON :one
+SELECT id, user_id, label, survey_number, village, taluk, district, state, state_code, pin_code,
+    ST_AsGeoJSON(boundary) AS boundary_geojson, centroid, area_sqm, land_type,
+    registered_area_sqm, title_deed_s3_key, status, monitoring_since, created_at, updated_at
+FROM parcels WHERE id = $1
+`
+
+type GetParcelWithGeoJSONRow struct {
+	ID                uuid.UUID          `json:"id"`
+	UserID            uuid.UUID          `json:"user_id"`
+	Label             *string            `json:"label"`
+	SurveyNumber      *string            `json:"survey_number"`
+	Village           *string            `json:"village"`
+	Taluk             *string            `json:"taluk"`
+	District          string             `json:"district"`
+	State             string             `json:"state"`
+	StateCode         string             `json:"state_code"`
+	PinCode           *string            `json:"pin_code"`
+	BoundaryGeojson   interface{}        `json:"boundary_geojson"`
+	Centroid          interface{}        `json:"centroid"`
+	AreaSqm           *float32           `json:"area_sqm"`
+	LandType          *string            `json:"land_type"`
+	RegisteredAreaSqm *float32           `json:"registered_area_sqm"`
+	TitleDeedS3Key    *string            `json:"title_deed_s3_key"`
+	Status            *string            `json:"status"`
+	MonitoringSince   pgtype.Timestamptz `json:"monitoring_since"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetParcelWithGeoJSON(ctx context.Context, id uuid.UUID) (GetParcelWithGeoJSONRow, error) {
+	row := q.db.QueryRow(ctx, getParcelWithGeoJSON, id)
+	var i GetParcelWithGeoJSONRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Label,
+		&i.SurveyNumber,
+		&i.Village,
+		&i.Taluk,
+		&i.District,
+		&i.State,
+		&i.StateCode,
+		&i.PinCode,
+		&i.BoundaryGeojson,
+		&i.Centroid,
+		&i.AreaSqm,
+		&i.LandType,
+		&i.RegisteredAreaSqm,
+		&i.TitleDeedS3Key,
+		&i.Status,
+		&i.MonitoringSince,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listParcelsByUser = `-- name: ListParcelsByUser :many
 SELECT id, user_id, label, survey_number, village, taluk, district, state, state_code, pin_code, boundary, centroid, area_sqm, land_type, registered_area_sqm, title_deed_s3_key, status, monitoring_since, created_at, updated_at FROM parcels
 WHERE user_id = $1 AND status = 'active'
@@ -231,6 +290,20 @@ func (q *Queries) ListParcelsByUser(ctx context.Context, arg ListParcelsByUserPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateParcelBoundary = `-- name: UpdateParcelBoundary :exec
+UPDATE parcels SET boundary = ST_GeomFromGeoJSON($2), updated_at = NOW() WHERE id = $1
+`
+
+type UpdateParcelBoundaryParams struct {
+	ID                uuid.UUID   `json:"id"`
+	StGeomfromgeojson interface{} `json:"st_geomfromgeojson"`
+}
+
+func (q *Queries) UpdateParcelBoundary(ctx context.Context, arg UpdateParcelBoundaryParams) error {
+	_, err := q.db.Exec(ctx, updateParcelBoundary, arg.ID, arg.StGeomfromgeojson)
+	return err
 }
 
 const updateParcelStatus = `-- name: UpdateParcelStatus :exec

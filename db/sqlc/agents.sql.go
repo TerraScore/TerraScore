@@ -486,6 +486,53 @@ func (q *Queries) UpdateAgentOnlineStatus(ctx context.Context, arg UpdateAgentOn
 	return err
 }
 
+const updateAgentProfile = `-- name: UpdateAgentProfile :exec
+UPDATE agents SET
+    full_name = COALESCE($2, full_name),
+    email = COALESCE($3, email),
+    vehicle_type = COALESCE($4, vehicle_type),
+    preferred_radius_km = COALESCE($5, preferred_radius_km),
+    bank_account_enc = COALESCE($6, bank_account_enc),
+    bank_ifsc = COALESCE($7, bank_ifsc),
+    upi_id = COALESCE($8, upi_id),
+    available_days = COALESCE($9, available_days),
+    available_start = COALESCE($10, available_start),
+    available_end = COALESCE($11, available_end),
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateAgentProfileParams struct {
+	ID                uuid.UUID   `json:"id"`
+	FullName          string      `json:"full_name"`
+	Email             *string     `json:"email"`
+	VehicleType       *string     `json:"vehicle_type"`
+	PreferredRadiusKm *int32      `json:"preferred_radius_km"`
+	BankAccountEnc    *string     `json:"bank_account_enc"`
+	BankIfsc          *string     `json:"bank_ifsc"`
+	UpiID             *string     `json:"upi_id"`
+	AvailableDays     []string    `json:"available_days"`
+	AvailableStart    pgtype.Time `json:"available_start"`
+	AvailableEnd      pgtype.Time `json:"available_end"`
+}
+
+func (q *Queries) UpdateAgentProfile(ctx context.Context, arg UpdateAgentProfileParams) error {
+	_, err := q.db.Exec(ctx, updateAgentProfile,
+		arg.ID,
+		arg.FullName,
+		arg.Email,
+		arg.VehicleType,
+		arg.PreferredRadiusKm,
+		arg.BankAccountEnc,
+		arg.BankIfsc,
+		arg.UpiID,
+		arg.AvailableDays,
+		arg.AvailableStart,
+		arg.AvailableEnd,
+	)
+	return err
+}
+
 const updateAgentStats = `-- name: UpdateAgentStats :exec
 UPDATE agents SET
     total_jobs_completed = $2,

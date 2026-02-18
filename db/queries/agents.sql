@@ -52,6 +52,21 @@ WHERE id = $1;
 -- name: UpdateAgentFCMToken :exec
 UPDATE agents SET fcm_token = $2, device_id = $3, app_version = $4, updated_at = NOW() WHERE id = $1;
 
+-- name: UpdateAgentProfile :exec
+UPDATE agents SET
+    full_name = COALESCE($2, full_name),
+    email = COALESCE($3, email),
+    vehicle_type = COALESCE($4, vehicle_type),
+    preferred_radius_km = COALESCE($5, preferred_radius_km),
+    bank_account_enc = COALESCE($6, bank_account_enc),
+    bank_ifsc = COALESCE($7, bank_ifsc),
+    upi_id = COALESCE($8, upi_id),
+    available_days = COALESCE($9, available_days),
+    available_start = COALESCE($10, available_start),
+    available_end = COALESCE($11, available_end),
+    updated_at = NOW()
+WHERE id = $1;
+
 -- name: ListAgents :many
 SELECT * FROM agents
 ORDER BY created_at DESC
