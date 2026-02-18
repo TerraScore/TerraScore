@@ -72,5 +72,21 @@ SELECT * FROM agents
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
 
+-- name: FindMatchableAgents :many
+SELECT *,
+    ST_Distance(last_known_location::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000 AS distance_km
+FROM agents
+WHERE status = 'active'
+    AND is_online = TRUE
+    AND last_location_at > NOW() - INTERVAL '10 minutes'
+    AND id != ALL($5::uuid[])
+    AND ST_DWithin(
+        last_known_location::geography,
+        ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+        $3
+    )
+ORDER BY distance_km ASC
+LIMIT $4;
+
 -- name: CountAgents :one
 SELECT count(*) FROM agents;

@@ -90,6 +90,19 @@ func (q *Queries) CompleteJob(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const countActiveJobsByAgent = `-- name: CountActiveJobsByAgent :one
+SELECT count(*) FROM survey_jobs
+WHERE assigned_agent_id = $1
+    AND status IN ('assigned', 'agent_on_site', 'survey_in_progress')
+`
+
+func (q *Queries) CountActiveJobsByAgent(ctx context.Context, assignedAgentID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveJobsByAgent, assignedAgentID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createJobOffer = `-- name: CreateJobOffer :one
 INSERT INTO job_offers (job_id, agent_id, cascade_round, offer_rank, distance_km, match_score, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -207,6 +220,59 @@ UPDATE job_offers SET status = 'expired' WHERE expires_at < NOW() AND status = '
 func (q *Queries) ExpireOffers(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, expireOffers)
 	return err
+}
+
+const getOfferByJobAndAgent = `-- name: GetOfferByJobAndAgent :one
+SELECT id, job_id, agent_id, cascade_round, offer_rank, distance_km, match_score, status, sent_at, responded_at, expires_at, decline_reason FROM job_offers WHERE job_id = $1 AND agent_id = $2 AND status = 'sent'
+`
+
+type GetOfferByJobAndAgentParams struct {
+	JobID   uuid.UUID `json:"job_id"`
+	AgentID uuid.UUID `json:"agent_id"`
+}
+
+func (q *Queries) GetOfferByJobAndAgent(ctx context.Context, arg GetOfferByJobAndAgentParams) (JobOffer, error) {
+	row := q.db.QueryRow(ctx, getOfferByJobAndAgent, arg.JobID, arg.AgentID)
+	var i JobOffer
+	err := row.Scan(
+		&i.ID,
+		&i.JobID,
+		&i.AgentID,
+		&i.CascadeRound,
+		&i.OfferRank,
+		&i.DistanceKm,
+		&i.MatchScore,
+		&i.Status,
+		&i.SentAt,
+		&i.RespondedAt,
+		&i.ExpiresAt,
+		&i.DeclineReason,
+	)
+	return i, err
+}
+
+const getPendingOfferByID = `-- name: GetPendingOfferByID :one
+SELECT id, job_id, agent_id, cascade_round, offer_rank, distance_km, match_score, status, sent_at, responded_at, expires_at, decline_reason FROM job_offers WHERE id = $1 AND status = 'sent'
+`
+
+func (q *Queries) GetPendingOfferByID(ctx context.Context, id uuid.UUID) (JobOffer, error) {
+	row := q.db.QueryRow(ctx, getPendingOfferByID, id)
+	var i JobOffer
+	err := row.Scan(
+		&i.ID,
+		&i.JobID,
+		&i.AgentID,
+		&i.CascadeRound,
+		&i.OfferRank,
+		&i.DistanceKm,
+		&i.MatchScore,
+		&i.Status,
+		&i.SentAt,
+		&i.RespondedAt,
+		&i.ExpiresAt,
+		&i.DeclineReason,
+	)
+	return i, err
 }
 
 const getSurveyJobByID = `-- name: GetSurveyJobByID :one

@@ -95,6 +95,135 @@ func (q *Queries) CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent
 	return i, err
 }
 
+const findMatchableAgents = `-- name: FindMatchableAgents :many
+SELECT id, full_name, phone, email, date_of_birth, aadhaar_hash, aadhaar_verified, home_location, last_known_location, last_location_at, preferred_radius_km, state_code, district_code, status, tier, vehicle_type, total_jobs_completed, avg_rating, completion_rate, qa_pass_rate, last_job_completed_at, bank_account_enc, bank_ifsc, upi_id, wallet_balance, certifications, fcm_token, device_id, app_version, is_online, available_days, available_start, available_end, keycloak_id, created_at, updated_at,
+    ST_Distance(last_known_location::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000 AS distance_km
+FROM agents
+WHERE status = 'active'
+    AND is_online = TRUE
+    AND last_location_at > NOW() - INTERVAL '10 minutes'
+    AND id != ALL($5::uuid[])
+    AND ST_DWithin(
+        last_known_location::geography,
+        ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+        $3
+    )
+ORDER BY distance_km ASC
+LIMIT $4
+`
+
+type FindMatchableAgentsParams struct {
+	StMakepoint   interface{} `json:"st_makepoint"`
+	StMakepoint_2 interface{} `json:"st_makepoint_2"`
+	StDwithin     interface{} `json:"st_dwithin"`
+	Limit         int32       `json:"limit"`
+	Column5       []uuid.UUID `json:"column_5"`
+}
+
+type FindMatchableAgentsRow struct {
+	ID                 uuid.UUID          `json:"id"`
+	FullName           string             `json:"full_name"`
+	Phone              string             `json:"phone"`
+	Email              *string            `json:"email"`
+	DateOfBirth        pgtype.Date        `json:"date_of_birth"`
+	AadhaarHash        *string            `json:"aadhaar_hash"`
+	AadhaarVerified    *bool              `json:"aadhaar_verified"`
+	HomeLocation       interface{}        `json:"home_location"`
+	LastKnownLocation  interface{}        `json:"last_known_location"`
+	LastLocationAt     pgtype.Timestamptz `json:"last_location_at"`
+	PreferredRadiusKm  *int32             `json:"preferred_radius_km"`
+	StateCode          *string            `json:"state_code"`
+	DistrictCode       *string            `json:"district_code"`
+	Status             *string            `json:"status"`
+	Tier               *string            `json:"tier"`
+	VehicleType        *string            `json:"vehicle_type"`
+	TotalJobsCompleted *int32             `json:"total_jobs_completed"`
+	AvgRating          pgtype.Numeric     `json:"avg_rating"`
+	CompletionRate     pgtype.Numeric     `json:"completion_rate"`
+	QaPassRate         pgtype.Numeric     `json:"qa_pass_rate"`
+	LastJobCompletedAt pgtype.Timestamptz `json:"last_job_completed_at"`
+	BankAccountEnc     *string            `json:"bank_account_enc"`
+	BankIfsc           *string            `json:"bank_ifsc"`
+	UpiID              *string            `json:"upi_id"`
+	WalletBalance      pgtype.Numeric     `json:"wallet_balance"`
+	Certifications     []string           `json:"certifications"`
+	FcmToken           *string            `json:"fcm_token"`
+	DeviceID           *string            `json:"device_id"`
+	AppVersion         *string            `json:"app_version"`
+	IsOnline           *bool              `json:"is_online"`
+	AvailableDays      []string           `json:"available_days"`
+	AvailableStart     pgtype.Time        `json:"available_start"`
+	AvailableEnd       pgtype.Time        `json:"available_end"`
+	KeycloakID         *string            `json:"keycloak_id"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	DistanceKm         int32              `json:"distance_km"`
+}
+
+func (q *Queries) FindMatchableAgents(ctx context.Context, arg FindMatchableAgentsParams) ([]FindMatchableAgentsRow, error) {
+	rows, err := q.db.Query(ctx, findMatchableAgents,
+		arg.StMakepoint,
+		arg.StMakepoint_2,
+		arg.StDwithin,
+		arg.Limit,
+		arg.Column5,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FindMatchableAgentsRow{}
+	for rows.Next() {
+		var i FindMatchableAgentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FullName,
+			&i.Phone,
+			&i.Email,
+			&i.DateOfBirth,
+			&i.AadhaarHash,
+			&i.AadhaarVerified,
+			&i.HomeLocation,
+			&i.LastKnownLocation,
+			&i.LastLocationAt,
+			&i.PreferredRadiusKm,
+			&i.StateCode,
+			&i.DistrictCode,
+			&i.Status,
+			&i.Tier,
+			&i.VehicleType,
+			&i.TotalJobsCompleted,
+			&i.AvgRating,
+			&i.CompletionRate,
+			&i.QaPassRate,
+			&i.LastJobCompletedAt,
+			&i.BankAccountEnc,
+			&i.BankIfsc,
+			&i.UpiID,
+			&i.WalletBalance,
+			&i.Certifications,
+			&i.FcmToken,
+			&i.DeviceID,
+			&i.AppVersion,
+			&i.IsOnline,
+			&i.AvailableDays,
+			&i.AvailableStart,
+			&i.AvailableEnd,
+			&i.KeycloakID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DistanceKm,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const findNearbyAgents = `-- name: FindNearbyAgents :many
 SELECT id, full_name, phone, email, date_of_birth, aadhaar_hash, aadhaar_verified, home_location, last_known_location, last_location_at, preferred_radius_km, state_code, district_code, status, tier, vehicle_type, total_jobs_completed, avg_rating, completion_rate, qa_pass_rate, last_job_completed_at, bank_account_enc, bank_ifsc, upi_id, wallet_balance, certifications, fcm_token, device_id, app_version, is_online, available_days, available_start, available_end, keycloak_id, created_at, updated_at,
     ST_Distance(last_known_location::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000 AS distance_km

@@ -74,5 +74,16 @@ SELECT * FROM job_offers
 WHERE agent_id = $1 AND status = 'sent'
 ORDER BY sent_at DESC;
 
+-- name: CountActiveJobsByAgent :one
+SELECT count(*) FROM survey_jobs
+WHERE assigned_agent_id = $1
+    AND status IN ('assigned', 'agent_on_site', 'survey_in_progress');
+
+-- name: GetOfferByJobAndAgent :one
+SELECT * FROM job_offers WHERE job_id = $1 AND agent_id = $2 AND status = 'sent';
+
+-- name: GetPendingOfferByID :one
+SELECT * FROM job_offers WHERE id = $1 AND status = 'sent';
+
 -- name: ExpireOffers :exec
 UPDATE job_offers SET status = 'expired' WHERE expires_at < NOW() AND status = 'sent';
