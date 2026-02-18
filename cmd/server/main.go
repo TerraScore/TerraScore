@@ -1,5 +1,8 @@
 package main
 
+// Version is set at build time via -ldflags "-X main.Version=..."
+var Version = "dev"
+
 import (
 	"context"
 	"fmt"
@@ -168,7 +171,7 @@ func run(ctx context.Context) error {
 
 	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		platform.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		platform.JSON(w, http.StatusOK, map[string]string{"status": "ok", "version": Version})
 	})
 
 	// WebSocket endpoint (outside /v1 prefix, no JWT middleware — auth via query param)
@@ -219,7 +222,7 @@ func run(ctx context.Context) error {
 		srv.Shutdown(shutdownCtx)
 	}()
 
-	logger.Info("server starting", "addr", addr, "env", cfg.Server.Env)
+	logger.Info("server starting", "version", Version, "addr", addr, "env", cfg.Server.Env)
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		return fmt.Errorf("server error: %w", err)
 	}

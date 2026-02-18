@@ -29,6 +29,9 @@ git reset --hard "origin/$BRANCH"
 # Ensure .env symlink
 ln -sf /opt/terrascore/.env "$REPO_DIR/.env"
 
+# Export version for docker compose build args
+export VERSION=$(cat VERSION 2>/dev/null || echo "dev")
+
 # Rebuild and restart only changed services
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 

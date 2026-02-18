@@ -6,6 +6,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+ARG VERSION=dev
+ENV NEXT_PUBLIC_APP_VERSION=$VERSION
 RUN npm run build
 
 # Runtime stage

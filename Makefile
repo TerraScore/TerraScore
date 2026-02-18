@@ -3,6 +3,7 @@
 # Config
 APP_NAME := terrascore-api
 MAIN := ./cmd/server
+VERSION := $(shell cat VERSION 2>/dev/null || echo dev)
 MIGRATE := ./cmd/migrate
 DB_URL ?= postgres://terrascore:terrascore@localhost:5432/terrascore?sslmode=disable
 
@@ -15,7 +16,7 @@ dev:
 
 # Build Go binary
 build:
-	CGO_ENABLED=0 go build -o bin/$(APP_NAME) $(MAIN)
+	CGO_ENABLED=0 go build -ldflags="-X main.Version=$(VERSION)" -o bin/$(APP_NAME) $(MAIN)
 
 # Run tests
 test:

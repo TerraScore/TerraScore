@@ -84,6 +84,7 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-gray-200">
+        <span className="text-xs text-gray-400">v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}</span>
         <p className="text-sm font-medium text-gray-900 truncate">{profile?.name || "User"}</p>
         <p className="text-xs text-gray-500 truncate">{profile?.phone}</p>
         <button

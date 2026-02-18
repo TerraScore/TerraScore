@@ -268,7 +268,7 @@ jobs:
           echo "Creating server ${{ steps.env.outputs.server_name }}..."
           hcloud server create \
             --name "${{ steps.env.outputs.server_name }}" \
-            --type cx32 \
+            --type cx33 \
             --image ubuntu-24.04 \
             --ssh-key terrascore-ci \
             --user-data-from-file /tmp/cloud-init.yml \

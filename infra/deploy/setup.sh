@@ -39,6 +39,9 @@ ln -sf "$ENV_FILE" "$REPO_DIR/.env"
 # Save branch for update script
 echo "$BRANCH" > /opt/terrascore/branch
 
+# Export version for docker compose build args
+export VERSION=$(cat VERSION 2>/dev/null || echo "dev")
+
 # Build and start all services
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 

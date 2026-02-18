@@ -1,6 +1,9 @@
 services:
   api:
-    build: .
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-dev}
     container_name: terrascore-api
     ports:
       - "8080:8080"
@@ -13,7 +16,10 @@ services:
     restart: unless-stopped
 
   web:
-    build: ./web
+    build:
+      context: ./web
+      args:
+        VERSION: ${VERSION:-dev}
     container_name: terrascore-web
     ports:
       - "3000:3000"
