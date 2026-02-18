@@ -1,8 +1,5 @@
 package main
 
-// Version is set at build time via -ldflags "-X main.Version=..."
-var Version = "dev"
-
 import (
 	"context"
 	"fmt"
@@ -27,6 +24,9 @@ import (
 	"github.com/terrascore/api/internal/survey"
 	"github.com/terrascore/api/internal/ws"
 )
+
+// Version is set at build time via -ldflags "-X main.Version=..."
+var Version = "dev"
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
