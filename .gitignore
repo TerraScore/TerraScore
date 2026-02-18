@@ -1,0 +1,54 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+build/
+
+# Go
+*.test
+*.out
+vendor/
+go.work
+go.work.sum
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Infrastructure secrets
+infra/secrets/
+*.pem
+*.key
+
+# Node (for future frontend)
+node_modules/
+.next/
+dist/
+
+# Docker
+docker-compose.override.yml
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+
+# sqlc generated (re-generate with make sqlc)
+# db/sqlc/ — we DO commit generated code
+
+# OS
+Thumbs.db

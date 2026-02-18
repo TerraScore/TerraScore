@@ -1,0 +1,1 @@
+This file will consit of all the ADRs and Coding Practices list and files which we will be maintaining for context and future development and Decisions we made in list like ADR-001 ( Naming of Variables ) like this. 
