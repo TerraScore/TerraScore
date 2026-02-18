@@ -151,8 +151,8 @@ jobs:
         if: steps.env.outputs.action != 'ignore'
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Ensure SSH key in Hetzner
@@ -161,7 +161,7 @@ jobs:
           HCLOUD_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
         run: |
           if ! hcloud ssh-key describe terrascore-ci &>/dev/null; then
-            PUBLIC_KEY=$(ssh-keygen -y -f ~/.ssh/id_rsa)
+            PUBLIC_KEY=$(ssh-keygen -y -f ~/.ssh/id_ed25519)
             hcloud ssh-key create --name terrascore-ci --public-key "$PUBLIC_KEY"
           fi
 
