@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/terrascore/api/internal/auth"
 	"github.com/terrascore/api/internal/platform"
 )
 
@@ -60,6 +61,13 @@ func run(ctx context.Context) error {
 	taskQueue := platform.NewTaskQueue(db, logger)
 	go taskQueue.Start(ctx)
 
+	// Auth module
+	keycloakClient := auth.NewKeycloakClient(cfg.Keycloak)
+	otpService := auth.NewOTPService(rdb, cfg.OTP.Provider, cfg.OTP.AuthKey, logger)
+	authRepo := auth.NewRepository(db)
+	authService := auth.NewService(authRepo, keycloakClient, otpService, logger)
+	authHandler := auth.NewHandler(authService)
+
 	// Router
 	r := chi.NewRouter()
 
@@ -77,13 +85,16 @@ func run(ctx context.Context) error {
 
 	// API v1 routes
 	r.Route("/v1", func(r chi.Router) {
-		// Auth routes will be wired in Milestone 5
-		// r.Mount("/auth", auth.Routes(...))
+		r.Mount("/auth", authHandler.Routes())
+
+		// Protected routes example (for future modules)
+		r.Group(func(r chi.Router) {
+			r.Use(auth.JWTAuth(keycloakClient))
+			// Future module routes go here
+		})
 	})
 
-	// Suppress unused variable warnings — these are used in Milestone 5
-	_ = cfg
-	_ = rdb
+	// Keep references for future use
 	_ = eventBus
 	_ = taskQueue
 
