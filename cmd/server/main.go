@@ -12,8 +12,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/terrascore/api/db/sqlc"
 	"github.com/terrascore/api/internal/agent"
 	"github.com/terrascore/api/internal/auth"
+	"github.com/terrascore/api/internal/job"
 	"github.com/terrascore/api/internal/land"
 	"github.com/terrascore/api/internal/platform"
 )
@@ -82,6 +84,20 @@ func run(ctx context.Context) error {
 	locationFlusher := agent.NewLocationFlusher(rdb, agentRepo, logger)
 	go locationFlusher.Start(ctx)
 
+	// Job module
+	jobRepo := job.NewRepository(db)
+	agentQueries := sqlc.New(db)
+	matcher := job.NewMatcher(agentQueries, jobRepo, logger)
+	dispatcher := job.NewDispatcher(matcher, jobRepo, rdb, eventBus, logger)
+	jobScheduler := job.NewScheduler(jobRepo, landRepo, eventBus, logger)
+	jobHandler := job.NewHandler(jobRepo, agentRepo, rdb, logger)
+
+	// Subscribe dispatcher to job.created events
+	eventBus.Subscribe("job.created", dispatcher.HandleJobCreated)
+
+	// Start job scheduler
+	go jobScheduler.Start(ctx)
+
 	// Router
 	r := chi.NewRouter()
 
@@ -106,10 +122,16 @@ func run(ctx context.Context) error {
 			r.Use(auth.JWTAuth(keycloakClient))
 			r.Mount("/parcels", landHandler.Routes())
 			r.Mount("/agents", agentHandler.Routes())
+			r.Mount("/jobs", jobHandler.Routes())
+
+			// Agent-specific job/offer routes (explicit to avoid mount conflicts)
+			r.With(auth.RequireRole("agent")).Get("/agents/me/jobs", jobHandler.ListAgentJobs)
+			r.With(auth.RequireRole("agent")).Get("/agents/me/offers", jobHandler.ListAgentOffers)
 		})
 	})
 
-	_ = taskQueue
+	_ = taskQueue    // Used in Phase 2+ for durable background tasks
+	_ = dispatcher   // Subscribed via eventBus, kept alive by event loop
 
 	// Start server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
