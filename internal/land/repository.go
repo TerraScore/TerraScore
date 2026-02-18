@@ -92,6 +92,15 @@ func (r *Repository) UpdateParcelBoundary(ctx context.Context, id uuid.UUID, geo
 	return nil
 }
 
+// FindParcelsNeedingSurvey returns active parcels with no in-flight survey jobs.
+func (r *Repository) FindParcelsNeedingSurvey(ctx context.Context, limit int32) ([]sqlc.Parcel, error) {
+	parcels, err := r.q.FindParcelsNeedingSurvey(ctx, limit)
+	if err != nil {
+		return nil, fmt.Errorf("finding parcels needing survey: %w", err)
+	}
+	return parcels, nil
+}
+
 // DeleteParcel soft-deletes a parcel by setting status to 'deleted'.
 func (r *Repository) DeleteParcel(ctx context.Context, id uuid.UUID) error {
 	err := r.q.DeleteParcel(ctx, id)
