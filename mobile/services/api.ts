@@ -1,8 +1,8 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const ACCESS_TOKEN_KEY = 'landintel_access_token';
-const REFRESH_TOKEN_KEY = 'landintel_refresh_token';
+const ACCESS_TOKEN_KEY = 'terrascore_access_token';
+const REFRESH_TOKEN_KEY = 'terrascore_refresh_token';
 
 export const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080';
 

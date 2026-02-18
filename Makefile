@@ -1,10 +1,10 @@
 .PHONY: dev build test migrate-up migrate-down sqlc lint clean
 
 # Config
-APP_NAME := landintel-api
+APP_NAME := terrascore-api
 MAIN := ./cmd/server
 MIGRATE := ./cmd/migrate
-DB_URL ?= postgres://landintel:landintel@localhost:5432/landintel?sslmode=disable
+DB_URL ?= postgres://terrascore:terrascore@localhost:5432/terrascore?sslmode=disable
 
 # Development — start infra + Go server
 dev:

@@ -11,16 +11,16 @@ RUN go mod download
 
 # Copy source and build
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/landintel-api ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/terrascore-api ./cmd/server
 
 # Runtime stage
 FROM alpine:3.20
 
 RUN apk add --no-cache ca-certificates tzdata
 
-COPY --from=builder /bin/landintel-api /bin/landintel-api
+COPY --from=builder /bin/terrascore-api /bin/terrascore-api
 COPY db/migrations /app/db/migrations
 
 EXPOSE 8080
 
-ENTRYPOINT ["/bin/landintel-api"]
+ENTRYPOINT ["/bin/terrascore-api"]

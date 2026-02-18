@@ -3,7 +3,7 @@ import Link from "next/link";
 import { NewParcelForm } from "@/components/parcels/NewParcelForm";
 
 export const metadata: Metadata = {
-  title: "New Parcel — LandIntel",
+  title: "New Parcel — TerraScore",
 };
 
 export default function NewParcelPage() {

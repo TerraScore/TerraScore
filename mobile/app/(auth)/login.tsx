@@ -66,7 +66,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.inner}>
-        <Text style={styles.title}>LandIntel</Text>
+        <Text style={styles.title}>TerraScore</Text>
         <Text style={styles.subtitle}>Agent Login</Text>
 
         {step === 'phone' ? (

@@ -1,7 +1,7 @@
 services:
   api:
     build: .
-    container_name: landintel-api
+    container_name: terrascore-api
     ports:
       - "8080:8080"
     env_file: .env
@@ -14,7 +14,7 @@ services:
 
   web:
     build: ./web
-    container_name: landintel-web
+    container_name: terrascore-web
     ports:
       - "3000:3000"
     restart: unless-stopped

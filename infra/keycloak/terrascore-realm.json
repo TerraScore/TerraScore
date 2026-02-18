@@ -1,5 +1,5 @@
 {
-  "realm": "landintel",
+  "realm": "terrascore",
   "enabled": true,
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
@@ -27,8 +27,8 @@
   },
   "users": [
     {
-      "username": "admin@landintel.in",
-      "email": "admin@landintel.in",
+      "username": "admin@terrascore.in",
+      "email": "admin@terrascore.in",
       "enabled": true,
       "firstName": "Admin",
       "lastName": "User",
@@ -106,7 +106,7 @@
       "publicClient": true,
       "directAccessGrantsEnabled": true,
       "standardFlowEnabled": false,
-      "redirectUris": ["landintel://callback"],
+      "redirectUris": ["terrascore://callback"],
       "defaultClientScopes": ["openid", "profile", "email"],
       "attributes": {
         "access.token.lifespan": "7200"

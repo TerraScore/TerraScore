@@ -89,9 +89,9 @@ func LoadConfig() (*Config, error) {
 	// Database defaults
 	v.SetDefault("DB_HOST", "localhost")
 	v.SetDefault("DB_PORT", 5432)
-	v.SetDefault("DB_USER", "landintel")
-	v.SetDefault("DB_PASSWORD", "landintel")
-	v.SetDefault("DB_NAME", "landintel")
+	v.SetDefault("DB_USER", "terrascore")
+	v.SetDefault("DB_PASSWORD", "terrascore")
+	v.SetDefault("DB_NAME", "terrascore")
 	v.SetDefault("DB_SSLMODE", "disable")
 
 	// Redis defaults
@@ -102,7 +102,7 @@ func LoadConfig() (*Config, error) {
 
 	// Keycloak defaults
 	v.SetDefault("KEYCLOAK_BASE_URL", "http://localhost:8180")
-	v.SetDefault("KEYCLOAK_REALM", "landintel")
+	v.SetDefault("KEYCLOAK_REALM", "terrascore")
 	v.SetDefault("KEYCLOAK_ADMIN_USER", "admin")
 	v.SetDefault("KEYCLOAK_ADMIN_PASS", "admin")
 	v.SetDefault("KEYCLOAK_CLIENT_ID", "web-app")
@@ -116,7 +116,7 @@ func LoadConfig() (*Config, error) {
 
 	// AWS defaults
 	v.SetDefault("AWS_REGION", "ap-south-1")
-	v.SetDefault("AWS_S3_BUCKET", "landintel-media")
+	v.SetDefault("AWS_S3_BUCKET", "terrascore-media")
 
 	// Notification defaults
 	v.SetDefault("NOTIFICATION_PROVIDER", "mock")

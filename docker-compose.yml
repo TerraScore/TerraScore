@@ -1,24 +1,24 @@
 services:
   postgres:
     image: postgis/postgis:16-3.4
-    container_name: landintel-postgres
+    container_name: terrascore-postgres
     environment:
-      POSTGRES_USER: landintel
-      POSTGRES_PASSWORD: landintel
-      POSTGRES_DB: landintel
+      POSTGRES_USER: terrascore
+      POSTGRES_PASSWORD: terrascore
+      POSTGRES_DB: terrascore
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U landintel"]
+      test: ["CMD-SHELL", "pg_isready -U terrascore"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: landintel-redis
+    container_name: terrascore-redis
     ports:
       - "6379:6379"
     volumes:
@@ -31,7 +31,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
-    container_name: landintel-keycloak
+    container_name: terrascore-keycloak
     command: start-dev --import-realm
     environment:
       KEYCLOAK_ADMIN: admin
@@ -41,7 +41,7 @@ services:
     ports:
       - "8180:8180"
     volumes:
-      - ./infra/keycloak/landintel-realm.json:/opt/keycloak/data/import/landintel-realm.json:ro
+      - ./infra/keycloak/terrascore-realm.json:/opt/keycloak/data/import/terrascore-realm.json:ro
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8180 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200'"]
       interval: 10s
@@ -51,7 +51,7 @@ services:
 
   kong:
     image: kong:3.6
-    container_name: landintel-kong
+    container_name: terrascore-kong
     environment:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
@@ -69,7 +69,7 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: landintel-minio
+    container_name: terrascore-minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin

@@ -26,13 +26,13 @@ jobs:
       postgres:
         image: postgis/postgis:16-3.4
         env:
-          POSTGRES_USER: landintel
-          POSTGRES_PASSWORD: landintel
-          POSTGRES_DB: landintel
+          POSTGRES_USER: terrascore
+          POSTGRES_PASSWORD: terrascore
+          POSTGRES_DB: terrascore
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U landintel"
+          --health-cmd "pg_isready -U terrascore"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -67,19 +67,19 @@ jobs:
         env:
           DB_HOST: localhost
           DB_PORT: 5432
-          DB_USER: landintel
-          DB_PASSWORD: landintel
-          DB_NAME: landintel
+          DB_USER: terrascore
+          DB_PASSWORD: terrascore
+          DB_NAME: terrascore
           DB_SSLMODE: disable
-        run: go run ./cmd/migrate -direction up -db "postgres://landintel:landintel@localhost:5432/landintel?sslmode=disable"
+        run: go run ./cmd/migrate -direction up -db "postgres://terrascore:terrascore@localhost:5432/terrascore?sslmode=disable"
 
       - name: Test
         env:
           DB_HOST: localhost
           DB_PORT: 5432
-          DB_USER: landintel
-          DB_PASSWORD: landintel
-          DB_NAME: landintel
+          DB_USER: terrascore
+          DB_PASSWORD: terrascore
+          DB_NAME: terrascore
           DB_SSLMODE: disable
           REDIS_HOST: localhost
           REDIS_PORT: 6379
@@ -131,11 +131,11 @@ jobs:
         run: |
           if [[ "${{ github.ref_name }}" == "main" ]]; then
             echo "env=prod" >> "$GITHUB_OUTPUT"
-            echo "server_name=landintel-prod" >> "$GITHUB_OUTPUT"
+            echo "server_name=terrascore-prod" >> "$GITHUB_OUTPUT"
             echo "app_env_secret=APP_ENV_PROD" >> "$GITHUB_OUTPUT"
           else
             echo "env=staging" >> "$GITHUB_OUTPUT"
-            echo "server_name=landintel-staging" >> "$GITHUB_OUTPUT"
+            echo "server_name=terrascore-staging" >> "$GITHUB_OUTPUT"
             echo "app_env_secret=APP_ENV_STAGING" >> "$GITHUB_OUTPUT"
           fi
 
@@ -151,8 +151,8 @@ jobs:
         if: steps.env.outputs.action != 'ignore'
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Ensure SSH key in Hetzner
@@ -160,9 +160,9 @@ jobs:
         env:
           HCLOUD_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
         run: |
-          if ! hcloud ssh-key describe landintel-ci &>/dev/null; then
-            PUBLIC_KEY=$(ssh-keygen -y -f ~/.ssh/id_ed25519)
-            hcloud ssh-key create --name landintel-ci --public-key "$PUBLIC_KEY"
+          if ! hcloud ssh-key describe terrascore-ci &>/dev/null; then
+            PUBLIC_KEY=$(ssh-keygen -y -f ~/.ssh/id_rsa)
+            hcloud ssh-key create --name terrascore-ci --public-key "$PUBLIC_KEY"
           fi
 
       - name: Check if server exists
@@ -235,7 +235,7 @@ jobs:
                   IdentityFile /root/.ssh/deploy_key
                   StrictHostKeyChecking no
 
-            - path: /opt/landintel/.env
+            - path: /opt/terrascore/.env
               permissions: "0600"
               content: |
           EOF
@@ -249,9 +249,9 @@ jobs:
           runcmd:
             - |
               curl -fsSL https://get.docker.com | sh
-              git clone -b ${BRANCH} git@github.com:${REPO}.git /opt/landintel/repo
+              git clone -b ${BRANCH} git@github.com:${REPO}.git /opt/terrascore/repo
               export BRANCH=${BRANCH}
-              bash /opt/landintel/repo/infra/deploy/setup.sh
+              bash /opt/terrascore/repo/infra/deploy/setup.sh
           RUNCMD_EOF
 
           # Strip leading whitespace from heredoc (cloud-init needs no leading spaces)
@@ -270,7 +270,7 @@ jobs:
             --name "${{ steps.env.outputs.server_name }}" \
             --type cx32 \
             --image ubuntu-24.04 \
-            --ssh-key landintel-ci \
+            --ssh-key terrascore-ci \
             --user-data-from-file /tmp/cloud-init.yml \
             --location fsn1
 
@@ -286,7 +286,7 @@ jobs:
           IP="${{ steps.server.outputs.ip }}"
           echo "Updating existing server at $IP..."
           ssh-keyscan -H "$IP" >> ~/.ssh/known_hosts 2>/dev/null
-          ssh -o StrictHostKeyChecking=no root@"$IP" 'FORCE=1 /opt/landintel/repo/infra/deploy/update.sh'
+          ssh -o StrictHostKeyChecking=no root@"$IP" 'FORCE=1 /opt/terrascore/repo/infra/deploy/update.sh'
           echo "Update complete."
 
       - name: Print server info

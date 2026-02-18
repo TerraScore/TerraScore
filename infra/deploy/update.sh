@@ -5,8 +5,8 @@ set -euo pipefail
 # Called by cron every 10 minutes and by CI SSH on demand.
 # Set FORCE=1 to rebuild even if no changes detected.
 
-REPO_DIR="/opt/landintel/repo"
-BRANCH="${BRANCH:-$(cat /opt/landintel/branch 2>/dev/null || echo main)}"
+REPO_DIR="/opt/terrascore/repo"
+BRANCH="${BRANCH:-$(cat /opt/terrascore/branch 2>/dev/null || echo main)}"
 FORCE="${FORCE:-0}"
 
 cd "$REPO_DIR"
@@ -27,7 +27,7 @@ echo "[$(date -Iseconds)] Updating: $LOCAL_SHA -> $REMOTE_SHA (force=$FORCE)"
 git reset --hard "origin/$BRANCH"
 
 # Ensure .env symlink
-ln -sf /opt/landintel/.env "$REPO_DIR/.env"
+ln -sf /opt/terrascore/.env "$REPO_DIR/.env"
 
 # Rebuild and restart only changed services
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build

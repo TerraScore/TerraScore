@@ -1,4 +1,4 @@
-# LandIntel
+# TerraScore
 
 Land intelligence and field verification platform. Connects landowners with field agents (Rapido-style gig model) for on-ground surveys, risk assessments, and property reports.
 
@@ -30,7 +30,7 @@ Land intelligence and field verification platform. Connects landowners with fiel
 | Identity  | Keycloak 24 (OTP via MSG91)                           |
 | Gateway   | Kong 3.6 (DB-less, declarative)                       |
 | Storage   | S3 / MinIO (local dev)                                |
-| Infra     | AWS ECS Fargate, RDS, ElastiCache, ALB                |
+| Infra     | Hetzner Cloud VPS, Docker Compose                     |
 
 ## Prerequisites
 
@@ -47,7 +47,7 @@ docker compose up -d
 
 # 2. Copy env and run migrations
 cp .env.example .env
-go run ./cmd/migrate -direction up -db "postgres://landintel:landintel@localhost:5432/landintel?sslmode=disable"
+go run ./cmd/migrate -direction up -db "postgres://terrascore:terrascore@localhost:5432/terrascore?sslmode=disable"
 
 # 3. Start the API server
 go run ./cmd/server
@@ -126,7 +126,7 @@ make sqlc
 ### Connect via psql
 
 ```bash
-psql "postgres://landintel:landintel@localhost:5432/landintel"
+psql "postgres://terrascore:terrascore@localhost:5432/terrascore"
 ```
 
 ## Testing
@@ -171,7 +171,7 @@ docker compose logs -f     # Tail logs
 ```bash
 make docker-build
 # Or directly:
-docker build -t landintel-api:latest .
+docker build -t terrascore-api:latest .
 ```
 
 ## CI/CD Pipeline
@@ -182,8 +182,7 @@ The GitHub Actions pipeline (`.github/workflows/ci.yml`) runs on every push to `
 |----------------|------------------|--------------------------------------------------|
 | `test-backend` | push + PRs       | Go vet, build, migrations, tests (with Postgres + Redis) |
 | `build-web`    | push + PRs       | npm ci, lint, Next.js build                      |
-| `docker`       | push to main     | Build and push image to GHCR                     |
-| `deploy`       | push to main     | Placeholder for ECS Fargate deployment            |
+| `deploy`       | push to main/develop | Hetzner VPS auto-deploy (create/recreate/delete/ignore) |
 
 ## API Endpoints
 

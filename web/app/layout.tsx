@@ -15,7 +15,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "LandIntel",
+  title: "TerraScore",
   description: "Land intelligence and field verification platform",
 };
 

@@ -4,7 +4,7 @@ let db: SQLiteDatabase | null = null;
 
 export async function getDB(): Promise<SQLiteDatabase> {
   if (db) return db;
-  db = await openDatabaseAsync('landintel.db');
+  db = await openDatabaseAsync('terrascore.db');
   await initTables(db);
   return db;
 }

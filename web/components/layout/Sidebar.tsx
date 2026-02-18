@@ -54,7 +54,7 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen">
       <div className="p-4 border-b border-gray-200">
-        <h1 className="text-lg font-bold text-emerald-700">LandIntel</h1>
+        <h1 className="text-lg font-bold text-emerald-700">TerraScore</h1>
         <p className="text-xs text-gray-500">Land intelligence platform</p>
       </div>
 

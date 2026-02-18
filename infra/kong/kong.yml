@@ -2,7 +2,7 @@ _format_version: "3.0"
 _transform: true
 
 services:
-  - name: landintel-api
+  - name: terrascore-api
     url: http://host.docker.internal:8080
     routes:
       - name: api-v1
@@ -30,7 +30,7 @@ services:
 
 plugins:
   - name: cors
-    service: landintel-api
+    service: terrascore-api
     config:
       origins:
         - "http://localhost:3000"
@@ -52,7 +52,7 @@ plugins:
       max_age: 3600
 
   - name: rate-limiting
-    service: landintel-api
+    service: terrascore-api
     config:
       minute: 60
       policy: local
@@ -60,7 +60,7 @@ plugins:
       hide_client_headers: false
 
   - name: request-size-limiting
-    service: landintel-api
+    service: terrascore-api
     config:
       allowed_payload_size: 10
       size_unit: megabytes

@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "LandIntel API (Sprints 1-6)",
-    "description": "Full API collection for LandIntel platform. Covers auth, parcels, agents, jobs, surveys, alerts, and reports.",
+    "name": "TerraScore API (Sprints 1-6)",
+    "description": "Full API collection for TerraScore platform. Covers auth, parcels, agents, jobs, surveys, alerts, and reports.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
