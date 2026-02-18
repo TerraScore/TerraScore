@@ -164,9 +164,7 @@ jobs:
             PUBLIC_KEY=$(ssh-keygen -y -f ~/.ssh/id_ed25519)
             hcloud ssh-key create --name terrascore-ci --public-key "$PUBLIC_KEY"
           fi
-          if ! hcloud ssh-key describe terrascore-local &>/dev/null; then
-            hcloud ssh-key create --name terrascore-local --public-key "${{ secrets.SSH_PUBLIC_KEY_LOCAL }}"
-          fi
+
 
       - name: Check if server exists
         if: steps.env.outputs.action != 'ignore'
@@ -274,7 +272,7 @@ jobs:
             --type cx33 \
             --image ubuntu-24.04 \
             --ssh-key terrascore-ci \
-            --ssh-key terrascore-local \
+            --ssh-key "wizmok800@gmail.com" \
             --user-data-from-file /tmp/cloud-init.yml \
             --location hel1
 
