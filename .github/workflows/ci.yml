@@ -272,7 +272,7 @@ jobs:
             --image ubuntu-24.04 \
             --ssh-key terrascore-ci \
             --user-data-from-file /tmp/cloud-init.yml \
-            --location fsn1
+            --location hel1
 
           # Wait for server to get IP
           sleep 5
