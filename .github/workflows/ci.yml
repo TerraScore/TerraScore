@@ -155,7 +155,7 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Ensure SSH key in Hetzner
+      - name: Ensure SSH keys in Hetzner
         if: steps.env.outputs.action != 'ignore'
         env:
           HCLOUD_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
@@ -163,6 +163,9 @@ jobs:
           if ! hcloud ssh-key describe terrascore-ci &>/dev/null; then
             PUBLIC_KEY=$(ssh-keygen -y -f ~/.ssh/id_ed25519)
             hcloud ssh-key create --name terrascore-ci --public-key "$PUBLIC_KEY"
+          fi
+          if ! hcloud ssh-key describe terrascore-local &>/dev/null; then
+            hcloud ssh-key create --name terrascore-local --public-key "${{ secrets.SSH_PUBLIC_KEY_LOCAL }}"
           fi
 
       - name: Check if server exists
@@ -243,15 +246,11 @@ jobs:
           # Append env file contents (indented for YAML block scalar)
           echo "$APP_ENV" | sed 's/^/            /' >> /tmp/cloud-init.yml
 
-          # Append runcmd (uses variable expansion for REPO, BRANCH, and SSH key)
-          LOCAL_PUBKEY="${{ secrets.SSH_PUBLIC_KEY_LOCAL }}"
+          # Append runcmd (uses variable expansion for REPO and BRANCH)
           cat >> /tmp/cloud-init.yml << RUNCMD_EOF
 
           runcmd:
             - |
-              mkdir -p /root/.ssh && chmod 700 /root/.ssh
-              echo "${LOCAL_PUBKEY}" >> /root/.ssh/authorized_keys
-              chmod 600 /root/.ssh/authorized_keys
               curl -fsSL https://get.docker.com | sh
               git clone -b ${BRANCH} git@github.com:${REPO}.git /opt/terrascore/repo
               export BRANCH=${BRANCH}
@@ -275,6 +274,7 @@ jobs:
             --type cx33 \
             --image ubuntu-24.04 \
             --ssh-key terrascore-ci \
+            --ssh-key terrascore-local \
             --user-data-from-file /tmp/cloud-init.yml \
             --location hel1
 
