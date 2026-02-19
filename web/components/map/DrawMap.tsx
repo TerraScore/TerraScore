@@ -2,32 +2,9 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import maplibregl from "maplibre-gl";
-import MapboxDraw from "@mapbox/mapbox-gl-draw";
+import MapboxDraw from "maplibre-gl-draw";
 import "maplibre-gl/dist/maplibre-gl.css";
-import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-
-// Patched draw styles — fixes line-dasharray incompatibility with MapLibre
-// MapLibre requires ["literal", [...]] for array values in expressions
-const drawStyles = [
-  // Polygon fill (active)
-  { id: "gl-draw-polygon-fill-active", type: "fill", filter: ["all", ["==", "$type", "Polygon"], ["==", "active", "true"]], paint: { "fill-color": "#fbb03b", "fill-outline-color": "#fbb03b", "fill-opacity": 0.1 } },
-  // Polygon fill (inactive)
-  { id: "gl-draw-polygon-fill-inactive", type: "fill", filter: ["all", ["==", "$type", "Polygon"], ["==", "active", "false"]], paint: { "fill-color": "#3bb2d0", "fill-outline-color": "#3bb2d0", "fill-opacity": 0.1 } },
-  // Polygon outline (active)
-  { id: "gl-draw-polygon-stroke-active", type: "line", filter: ["all", ["==", "$type", "Polygon"], ["==", "active", "true"]], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fbb03b", "line-dasharray": ["literal", [0.2, 2]], "line-width": 2 } },
-  // Polygon outline (inactive)
-  { id: "gl-draw-polygon-stroke-inactive", type: "line", filter: ["all", ["==", "$type", "Polygon"], ["==", "active", "false"]], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#3bb2d0", "line-dasharray": ["literal", [0.2, 2]], "line-width": 2 } },
-  // Polygon midpoints
-  { id: "gl-draw-polygon-midpoint", type: "circle", filter: ["all", ["==", "$type", "Point"], ["==", "meta", "midpoint"]], paint: { "circle-radius": 3, "circle-color": "#fbb03b" } },
-  // Vertex points (active)
-  { id: "gl-draw-point-active", type: "circle", filter: ["all", ["==", "$type", "Point"], ["==", "meta", "vertex"], ["==", "active", "true"]], paint: { "circle-radius": 5, "circle-color": "#fff", "circle-stroke-color": "#fbb03b", "circle-stroke-width": 2 } },
-  // Vertex points (inactive)
-  { id: "gl-draw-point-inactive", type: "circle", filter: ["all", ["==", "$type", "Point"], ["==", "meta", "vertex"], ["==", "active", "false"]], paint: { "circle-radius": 3, "circle-color": "#fff", "circle-stroke-color": "#3bb2d0", "circle-stroke-width": 2 } },
-  // Line (active)
-  { id: "gl-draw-line-active", type: "line", filter: ["all", ["==", "$type", "LineString"], ["==", "active", "true"]], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fbb03b", "line-dasharray": ["literal", [0.2, 2]], "line-width": 2 } },
-  // Line (inactive)
-  { id: "gl-draw-line-inactive", type: "line", filter: ["all", ["==", "$type", "LineString"], ["==", "active", "false"]], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#3bb2d0", "line-dasharray": ["literal", [0.2, 2]], "line-width": 2 } },
-];
+import "maplibre-gl-draw/dist/mapbox-gl-draw.css";
 
 interface DrawMapProps {
   initialGeometry?: GeoJSON.Geometry | null;
@@ -64,13 +41,6 @@ export function DrawMap({ initialGeometry, onBoundaryChange, center }: DrawMapPr
     });
 
     map.current.addControl(new maplibregl.NavigationControl(), "top-right");
-    map.current.addControl(
-      new maplibregl.GeolocateControl({
-        positionOptions: { enableHighAccuracy: true },
-        trackUserLocation: false,
-      }),
-      "top-right"
-    );
 
     draw.current = new MapboxDraw({
       displayControlsDefault: false,
@@ -78,7 +48,6 @@ export function DrawMap({ initialGeometry, onBoundaryChange, center }: DrawMapPr
         polygon: true,
         trash: true,
       },
-      styles: drawStyles,
     });
 
     map.current.addControl(draw.current as unknown as maplibregl.IControl, "top-left");

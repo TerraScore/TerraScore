@@ -10,9 +10,9 @@
   },
   "dependencies": {
     "@mapbox/geojson-area": "^0.2.2",
-    "@mapbox/mapbox-gl-draw": "^1.5.1",
     "@tanstack/react-query": "^5.90.21",
     "maplibre-gl": "^5.18.0",
+    "maplibre-gl-draw": "^1.6.9",
     "next": "14.2.35",
     "react": "^18",
     "react-dom": "^18",

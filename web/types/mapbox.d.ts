@@ -1,4 +1,4 @@
-declare module "@mapbox/mapbox-gl-draw" {
+declare module "maplibre-gl-draw" {
   import type { IControl, Map } from "maplibre-gl";
 
   interface DrawOptions {
