@@ -131,18 +131,14 @@ func (s *Service) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*VerifyO
 
 	// Set a temporary password in Keycloak and exchange for tokens
 	// In production, use a proper OTP SPI in Keycloak
-	user, err := s.repo.GetUserByPhone(ctx, req.Phone)
+	keycloakID, err := s.repo.GetKeycloakIDByPhone(ctx, req.Phone)
 	if err != nil {
 		return nil, err
 	}
 
-	if user.KeycloakID == nil {
-		return nil, platform.NewInternal("user has no keycloak ID", nil)
-	}
-
 	// Use phone as temp password for token exchange after OTP
 	tempPass := "otp-verified-" + req.Phone
-	if err := s.keycloak.SetTemporaryPassword(ctx, *user.KeycloakID, tempPass); err != nil {
+	if err := s.keycloak.SetTemporaryPassword(ctx, keycloakID, tempPass); err != nil {
 		return nil, fmt.Errorf("setting temp password: %w", err)
 	}
 
@@ -163,14 +159,14 @@ type LoginRequest struct {
 	Phone string `json:"phone"`
 }
 
-// Login sends an OTP for an existing user.
+// Login sends an OTP for an existing user (landowner or agent).
 func (s *Service) Login(ctx context.Context, req LoginRequest) (*RegisterResponse, error) {
 	if req.Phone == "" {
 		return nil, platform.NewValidation("phone is required")
 	}
 
-	// Verify user exists
-	_, err := s.repo.GetUserByPhone(ctx, req.Phone)
+	// Verify user exists in either users or agents table
+	_, err := s.repo.GetKeycloakIDByPhone(ctx, req.Phone)
 	if err != nil {
 		return nil, err
 	}

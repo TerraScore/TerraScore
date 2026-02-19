@@ -46,6 +46,23 @@ func (r *Repository) GetUserByPhone(ctx context.Context, phone string) (*sqlc.Us
 	return &user, nil
 }
 
+// GetKeycloakIDByPhone looks up the Keycloak ID by phone, checking users first then agents.
+func (r *Repository) GetKeycloakIDByPhone(ctx context.Context, phone string) (string, error) {
+	// Check users table first
+	user, err := r.q.GetUserByPhone(ctx, phone)
+	if err == nil && user.KeycloakID != nil {
+		return *user.KeycloakID, nil
+	}
+
+	// Check agents table
+	agent, err := r.q.GetAgentByPhone(ctx, phone)
+	if err == nil && agent.KeycloakID != nil {
+		return *agent.KeycloakID, nil
+	}
+
+	return "", platform.NewNotFound("user not found")
+}
+
 // GetUserByKeycloakID finds a user by their Keycloak ID.
 func (r *Repository) GetUserByKeycloakID(ctx context.Context, keycloakID string) (*sqlc.User, error) {
 	user, err := r.q.GetUserByKeycloakID(ctx, &keycloakID)
