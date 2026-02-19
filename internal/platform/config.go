@@ -2,6 +2,7 @@ package platform
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -35,7 +36,7 @@ type DBConfig struct {
 
 func (c DBConfig) DSN() string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		c.User, c.Password, c.Host, c.Port, c.Name, c.SSLMode)
+		url.PathEscape(c.User), url.PathEscape(c.Password), c.Host, c.Port, c.Name, c.SSLMode)
 }
 
 type RedisConfig struct {

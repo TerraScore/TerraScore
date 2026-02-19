@@ -54,8 +54,9 @@ set -a
 source "$ENV_FILE"
 set +a
 
-# Build DB_URL from env vars
-DB_URL="postgres://${DB_USER:-terrascore}:${DB_PASSWORD:-terrascore}@terrascore-postgres:5432/${DB_NAME:-terrascore}?sslmode=disable"
+# Build DB_URL from env vars (URL-encode password in case it contains special chars)
+ENCODED_PW=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${DB_PASSWORD:-terrascore}', safe=''))")
+DB_URL="postgres://${DB_USER:-terrascore}:${ENCODED_PW}@terrascore-postgres:5432/${DB_NAME:-terrascore}?sslmode=disable"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T api /bin/terrascore-migrate -direction up -path /app/db/migrations -db "$DB_URL" || \
     echo "Migration failed or already applied — skipping."
 
