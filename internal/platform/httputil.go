@@ -2,6 +2,7 @@ package platform
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 )
@@ -52,6 +53,7 @@ func HandleError(w http.ResponseWriter, err error) {
 		JSONError(w, appErr.Status, appErr.Code, appErr.Message)
 		return
 	}
+	slog.Error("unhandled error", "error", err)
 	JSONError(w, http.StatusInternalServerError, CodeInternal, "an unexpected error occurred")
 }
 
