@@ -1,5 +1,5 @@
 declare module "@mapbox/mapbox-gl-draw" {
-  import type { IControl } from "mapbox-gl";
+  import type { IControl, Map } from "maplibre-gl";
 
   interface DrawOptions {
     displayControlsDefault?: boolean;
@@ -16,8 +16,8 @@ declare module "@mapbox/mapbox-gl-draw" {
 
   export default class MapboxDraw implements IControl {
     constructor(options?: DrawOptions);
-    onAdd(map: mapboxgl.Map): HTMLElement;
-    onRemove(): void;
+    onAdd(map: Map): HTMLElement;
+    onRemove(map: Map): void;
     add(geojson: GeoJSON.Feature | GeoJSON.FeatureCollection): string[];
     getAll(): GeoJSON.FeatureCollection;
     delete(ids: string | string[]): this;

@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
-import mapboxgl from "mapbox-gl";
+import maplibregl from "maplibre-gl";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
-import "mapbox-gl/dist/mapbox-gl.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
 interface DrawMapProps {
@@ -14,9 +14,9 @@ interface DrawMapProps {
 
 export function DrawMap({ initialGeometry, onBoundaryChange, center }: DrawMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
+  const map = useRef<maplibregl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
-  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  const token = process.env.NEXT_PUBLIC_MAPTILER_KEY;
 
   const handleDrawChange = useCallback(() => {
     if (!draw.current) return;
@@ -33,18 +33,16 @@ export function DrawMap({ initialGeometry, onBoundaryChange, center }: DrawMapPr
   useEffect(() => {
     if (!mapContainer.current || map.current || !token) return;
 
-    mapboxgl.accessToken = token;
-
-    map.current = new mapboxgl.Map({
+    map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/satellite-streets-v12",
+      style: `https://api.maptiler.com/maps/hybrid/style.json?key=${token}`,
       center: center || [78.9629, 20.5937],
       zoom: center ? 14 : 5,
     });
 
-    map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+    map.current.addControl(new maplibregl.NavigationControl(), "top-right");
     map.current.addControl(
-      new mapboxgl.GeolocateControl({
+      new maplibregl.GeolocateControl({
         positionOptions: { enableHighAccuracy: true },
         trackUserLocation: false,
       }),
@@ -59,7 +57,7 @@ export function DrawMap({ initialGeometry, onBoundaryChange, center }: DrawMapPr
       },
     });
 
-    map.current.addControl(draw.current as unknown as mapboxgl.IControl, "top-left");
+    map.current.addControl(draw.current as unknown as maplibregl.IControl, "top-left");
 
     map.current.on("draw.create", handleDrawChange);
     map.current.on("draw.update", handleDrawChange);
@@ -77,7 +75,7 @@ export function DrawMap({ initialGeometry, onBoundaryChange, center }: DrawMapPr
 
           // Fit to existing boundary
           if (initialGeometry.type === "Polygon") {
-            const bounds = new mapboxgl.LngLatBounds();
+            const bounds = new maplibregl.LngLatBounds();
             initialGeometry.coordinates[0].forEach((coord) =>
               bounds.extend(coord as [number, number])
             );
@@ -97,7 +95,7 @@ export function DrawMap({ initialGeometry, onBoundaryChange, center }: DrawMapPr
   if (!token) {
     return (
       <div className="w-full h-full rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 text-sm">
-        Map unavailable — NEXT_PUBLIC_MAPBOX_TOKEN not configured
+        Map unavailable — NEXT_PUBLIC_MAPTILER_KEY not configured
       </div>
     );
   }

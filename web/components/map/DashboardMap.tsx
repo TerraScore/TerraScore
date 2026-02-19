@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import type { Parcel } from "@/lib/types";
 
 // Indian state centers for marker placement
@@ -30,23 +30,21 @@ interface DashboardMapProps {
 
 export function DashboardMap({ parcels, selectedParcel, onMarkerClick }: DashboardMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const markers = useRef<mapboxgl.Marker[]>([]);
-  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  const map = useRef<maplibregl.Map | null>(null);
+  const markers = useRef<maplibregl.Marker[]>([]);
+  const token = process.env.NEXT_PUBLIC_MAPTILER_KEY;
 
   useEffect(() => {
     if (!mapContainer.current || map.current || !token) return;
 
-    mapboxgl.accessToken = token;
-
-    map.current = new mapboxgl.Map({
+    map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/light-v11",
+      style: `https://api.maptiler.com/maps/streets-v2-light/style.json?key=${token}`,
       center: [78.9629, 20.5937], // India center
       zoom: 4.5,
     });
 
-    map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+    map.current.addControl(new maplibregl.NavigationControl(), "top-right");
 
     return () => {
       map.current?.remove();
@@ -72,7 +70,7 @@ export function DashboardMap({ parcels, selectedParcel, onMarkerClick }: Dashboa
         parcel.id === selectedParcel?.id ? "#059669" : "#10b981"
       }"/><circle cx="12" cy="12" r="5" fill="white"/></svg>`;
 
-      const marker = new mapboxgl.Marker({ element: el })
+      const marker = new maplibregl.Marker({ element: el })
         .setLngLat(center)
         .addTo(map.current!);
 
@@ -129,7 +127,7 @@ export function DashboardMap({ parcels, selectedParcel, onMarkerClick }: Dashboa
       // Fit to boundary
       const coords = (selectedParcel.boundary_geojson as GeoJSON.Polygon).coordinates[0];
       if (coords) {
-        const bounds = new mapboxgl.LngLatBounds();
+        const bounds = new maplibregl.LngLatBounds();
         coords.forEach((coord) => bounds.extend(coord as [number, number]));
         m.fitBounds(bounds, { padding: 80, maxZoom: 16 });
       }
@@ -145,7 +143,7 @@ export function DashboardMap({ parcels, selectedParcel, onMarkerClick }: Dashboa
   if (!token) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500 text-sm">
-        Map unavailable — NEXT_PUBLIC_MAPBOX_TOKEN not configured
+        Map unavailable — NEXT_PUBLIC_MAPTILER_KEY not configured
       </div>
     );
   }

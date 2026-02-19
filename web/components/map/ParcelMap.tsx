@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 interface ParcelMapProps {
   boundary: GeoJSON.Geometry;
@@ -10,22 +10,20 @@ interface ParcelMapProps {
 
 export function ParcelMap({ boundary }: ParcelMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  const map = useRef<maplibregl.Map | null>(null);
+  const token = process.env.NEXT_PUBLIC_MAPTILER_KEY;
 
   useEffect(() => {
     if (!mapContainer.current || map.current || !token) return;
 
-    mapboxgl.accessToken = token;
-
-    map.current = new mapboxgl.Map({
+    map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/satellite-streets-v12",
+      style: `https://api.maptiler.com/maps/hybrid/style.json?key=${token}`,
       center: [78.9629, 20.5937],
       zoom: 5,
     });
 
-    map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+    map.current.addControl(new maplibregl.NavigationControl(), "top-right");
 
     map.current.on("load", () => {
       if (!map.current) return;
@@ -61,7 +59,7 @@ export function ParcelMap({ boundary }: ParcelMapProps) {
 
       // Fit to boundary
       if (boundary.type === "Polygon") {
-        const bounds = new mapboxgl.LngLatBounds();
+        const bounds = new maplibregl.LngLatBounds();
         boundary.coordinates[0].forEach((coord) =>
           bounds.extend(coord as [number, number])
         );
@@ -78,7 +76,7 @@ export function ParcelMap({ boundary }: ParcelMapProps) {
   if (!token) {
     return (
       <div className="w-full h-full rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 text-sm">
-        Map unavailable — NEXT_PUBLIC_MAPBOX_TOKEN not configured
+        Map unavailable — NEXT_PUBLIC_MAPTILER_KEY not configured
       </div>
     );
   }
