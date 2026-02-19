@@ -12,6 +12,7 @@ declare module "@mapbox/mapbox-gl-draw" {
       uncombine_features?: boolean;
     };
     defaultMode?: string;
+    styles?: Record<string, unknown>[];
   }
 
   export default class MapboxDraw implements IControl {
