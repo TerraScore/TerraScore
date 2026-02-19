@@ -62,6 +62,28 @@ func (r *Repository) UpdateJobStatus(ctx context.Context, id uuid.UUID, status s
 	return &job, nil
 }
 
+// GetActiveJobsByParcel returns jobs for a parcel that are not completed or cancelled.
+func (r *Repository) GetActiveJobsByParcel(ctx context.Context, parcelID uuid.UUID) ([]sqlc.SurveyJob, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT id FROM survey_jobs WHERE parcel_id = $1 AND status NOT IN ('completed', 'cancelled') LIMIT 1`,
+		parcelID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("checking active jobs: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []sqlc.SurveyJob
+	for rows.Next() {
+		var j sqlc.SurveyJob
+		if err := rows.Scan(&j.ID); err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, j)
+	}
+	return jobs, nil
+}
+
 // AssignAgent assigns an agent to a survey job.
 func (r *Repository) AssignAgent(ctx context.Context, params sqlc.AssignAgentParams) (*sqlc.SurveyJob, error) {
 	job, err := r.q.AssignAgent(ctx, params)

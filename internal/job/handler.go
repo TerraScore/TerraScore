@@ -26,6 +26,7 @@ type Handler struct {
 	agentRepo  *agent.Repository
 	surveyRepo *survey.Repository
 	queries    *sqlc.Queries
+	scheduler  *Scheduler
 	s3Client   *platform.S3Client
 	rdb        *redis.Client
 	eventBus   *platform.EventBus
@@ -33,12 +34,13 @@ type Handler struct {
 }
 
 // NewHandler creates a job handler.
-func NewHandler(jobRepo *Repository, agentRepo *agent.Repository, surveyRepo *survey.Repository, queries *sqlc.Queries, s3Client *platform.S3Client, rdb *redis.Client, eventBus *platform.EventBus, logger *slog.Logger) *Handler {
+func NewHandler(jobRepo *Repository, agentRepo *agent.Repository, surveyRepo *survey.Repository, queries *sqlc.Queries, scheduler *Scheduler, s3Client *platform.S3Client, rdb *redis.Client, eventBus *platform.EventBus, logger *slog.Logger) *Handler {
 	return &Handler{
 		jobRepo:    jobRepo,
 		agentRepo:  agentRepo,
 		surveyRepo: surveyRepo,
 		queries:    queries,
+		scheduler:  scheduler,
 		s3Client:   s3Client,
 		rdb:        rdb,
 		eventBus:   eventBus,
@@ -224,6 +226,60 @@ func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	platform.JSON(w, http.StatusOK, resp)
+}
+
+// RequestSurvey handles POST /v1/parcels/{parcelId}/request-survey.
+// Landowner explicitly triggers a survey for their parcel.
+func (h *Handler) RequestSurvey(w http.ResponseWriter, r *http.Request) {
+	userCtx := auth.GetUser(r.Context())
+	if userCtx == nil {
+		platform.JSONError(w, http.StatusUnauthorized, platform.CodeUnauthorized, "not authenticated")
+		return
+	}
+
+	parcelID, err := uuid.Parse(chi.URLParam(r, "parcelId"))
+	if err != nil {
+		platform.HandleError(w, platform.NewBadRequest("invalid parcel ID"))
+		return
+	}
+
+	// Resolve keycloak_id to local user
+	user, err := h.queries.GetUserByKeycloakID(r.Context(), &userCtx.KeycloakID)
+	if err != nil {
+		platform.HandleError(w, platform.NewNotFound("user not found"))
+		return
+	}
+
+	// Verify parcel exists and belongs to this user
+	parcel, err := h.queries.GetParcelByID(r.Context(), parcelID)
+	if err != nil {
+		platform.HandleError(w, platform.NewNotFound("parcel not found"))
+		return
+	}
+	if parcel.UserID != user.ID {
+		platform.JSONError(w, http.StatusForbidden, "FORBIDDEN", "not your parcel")
+		return
+	}
+
+	// Check if there's already an active job for this parcel
+	existingJobs, err := h.jobRepo.GetActiveJobsByParcel(r.Context(), parcelID)
+	if err == nil && len(existingJobs) > 0 {
+		platform.JSONError(w, http.StatusConflict, "CONFLICT", "a survey is already in progress for this parcel")
+		return
+	}
+
+	// Create job and dispatch
+	job, err := h.scheduler.CreateJobForParcel(r.Context(), parcel)
+	if err != nil {
+		h.logger.Error("failed to create survey job", "parcel_id", parcelID, "error", err)
+		platform.HandleError(w, err)
+		return
+	}
+
+	platform.JSON(w, http.StatusCreated, JobResponseFromSqlc(
+		job.ID, job.ParcelID, job.UserID, job.SurveyType, job.Priority,
+		job.Deadline, job.Status, job.AssignedAgentID, job.AssignedAt, job.CreatedAt,
+	))
 }
 
 // ListAgentJobs handles GET /v1/agents/me/jobs.

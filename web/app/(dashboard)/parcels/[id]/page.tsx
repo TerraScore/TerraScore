@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import { useParcel } from "@/hooks/useParcel";
 import { useUpdateBoundary } from "@/hooks/useUpdateBoundary";
 import { useDeleteParcel } from "@/hooks/useDeleteParcel";
+import { useRequestSurvey } from "@/hooks/useRequestSurvey";
 import { ParcelStatusBadge } from "@/components/parcels/ParcelStatusBadge";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
@@ -26,6 +27,7 @@ export default function ParcelDetailPage({ params }: { params: { id: string } })
   const { data, isLoading, error, refetch } = useParcel(params.id);
   const updateBoundary = useUpdateBoundary(params.id);
   const deleteParcel = useDeleteParcel();
+  const requestSurvey = useRequestSurvey();
 
   const [isEditing, setIsEditing] = useState(false);
   const [newBoundary, setNewBoundary] = useState<string | null>(null);
@@ -110,6 +112,29 @@ export default function ParcelDetailPage({ params }: { params: { id: string } })
                 <span className="font-medium text-gray-900">{f.value}</span>
               </div>
             ))}
+          </div>
+
+          {/* Request Survey */}
+          <div className="border-t border-gray-200 pt-4 mb-4">
+            <Button
+              size="sm"
+              onClick={async () => {
+                try {
+                  await requestSurvey.mutateAsync(params.id);
+                  alert("Survey requested! An agent will be dispatched shortly.");
+                } catch (err: unknown) {
+                  const msg = err instanceof Error ? err.message : "Failed to request survey";
+                  alert(msg);
+                }
+              }}
+              loading={requestSurvey.isPending}
+              className="w-full"
+            >
+              Request Field Survey
+            </Button>
+            {requestSurvey.error && (
+              <p className="text-sm text-red-600 mt-1">{requestSurvey.error.message}</p>
+            )}
           </div>
 
           {/* Sub-navigation */}

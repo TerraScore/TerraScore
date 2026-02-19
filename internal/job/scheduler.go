@@ -90,6 +90,21 @@ func (s *Scheduler) tick(ctx context.Context) {
 	)
 }
 
+// CreateJobForParcel creates a basic_check survey job for a parcel and publishes a job.created event.
+func (s *Scheduler) CreateJobForParcel(ctx context.Context, parcel sqlc.Parcel) (*sqlc.SurveyJob, error) {
+	job, err := s.createJobForParcel(ctx, parcel)
+	if err != nil {
+		return nil, err
+	}
+
+	s.eventBus.Publish(platform.Event{
+		Type:    "job.created",
+		Payload: job,
+	})
+
+	return job, nil
+}
+
 // createJobForParcel creates a basic_check survey job with a 72-hour deadline.
 // Phase 1 simplification: all parcels get basic_check, no subscription check.
 func (s *Scheduler) createJobForParcel(ctx context.Context, p sqlc.Parcel) (*sqlc.SurveyJob, error) {

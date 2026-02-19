@@ -107,7 +107,7 @@ func run(ctx context.Context) error {
 	matcher := job.NewMatcher(agentQueries, jobRepo, logger)
 	dispatcher := job.NewDispatcher(matcher, jobRepo, rdb, eventBus, logger)
 	jobScheduler := job.NewScheduler(jobRepo, landRepo, eventBus, logger)
-	jobHandler := job.NewHandler(jobRepo, agentRepo, surveyRepo, agentQueries, s3Client, rdb, eventBus, logger)
+	jobHandler := job.NewHandler(jobRepo, agentRepo, surveyRepo, agentQueries, jobScheduler, s3Client, rdb, eventBus, logger)
 
 	// QA module
 	qaRepo := qa.NewRepository(db)
@@ -192,6 +192,9 @@ func run(ctx context.Context) error {
 			r.Mount("/agents", agentHandler.Routes())
 			r.Mount("/jobs", jobHandler.Routes())
 			r.Mount("/alerts", notifHandler.Routes())
+
+			// Landowner requests a survey for their parcel
+			r.With(auth.RequireRole("landowner")).Post("/parcels/{parcelId}/request-survey", jobHandler.RequestSurvey)
 
 			// Report routes
 			r.Get("/parcels/{parcelId}/reports", reportHandler.ListByParcel)
