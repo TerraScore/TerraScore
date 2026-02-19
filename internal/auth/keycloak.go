@@ -64,13 +64,14 @@ type TokenResponse struct {
 
 // KeycloakUser represents a user in Keycloak.
 type KeycloakUser struct {
-	ID         string            `json:"id,omitempty"`
-	Username   string            `json:"username"`
-	Email      string            `json:"email,omitempty"`
-	FirstName  string            `json:"firstName,omitempty"`
-	LastName   string            `json:"lastName,omitempty"`
-	Enabled    bool              `json:"enabled"`
-	Attributes map[string][]string `json:"attributes,omitempty"`
+	ID              string              `json:"id,omitempty"`
+	Username        string              `json:"username"`
+	Email           string              `json:"email,omitempty"`
+	FirstName       string              `json:"firstName,omitempty"`
+	LastName        string              `json:"lastName,omitempty"`
+	Enabled         bool                `json:"enabled"`
+	Attributes      map[string][]string `json:"attributes,omitempty"`
+	RequiredActions []string            `json:"requiredActions"`
 }
 
 // getAdminToken retrieves or refreshes the admin access token.

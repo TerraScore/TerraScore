@@ -62,6 +62,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 		Attributes: map[string][]string{
 			"phone_number": {req.Phone},
 		},
+		RequiredActions: []string{},
 	}
 
 	keycloakID, err := s.keycloak.CreateUser(ctx, kcUser)
