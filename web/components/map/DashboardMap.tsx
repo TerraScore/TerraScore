@@ -32,11 +32,12 @@ export function DashboardMap({ parcels, selectedParcel, onMarkerClick }: Dashboa
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
+  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+    if (!mapContainer.current || map.current || !token) return;
 
-    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
+    mapboxgl.accessToken = token;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -140,6 +141,14 @@ export function DashboardMap({ parcels, selectedParcel, onMarkerClick }: Dashboa
       m.on("style.load", addBoundary);
     }
   }, [selectedParcel]);
+
+  if (!token) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500 text-sm">
+        Map unavailable — NEXT_PUBLIC_MAPBOX_TOKEN not configured
+      </div>
+    );
+  }
 
   return <div ref={mapContainer} className="w-full h-full" />;
 }

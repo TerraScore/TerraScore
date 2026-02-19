@@ -16,6 +16,7 @@ export function DrawMap({ initialGeometry, onBoundaryChange, center }: DrawMapPr
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
+  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
   const handleDrawChange = useCallback(() => {
     if (!draw.current) return;
@@ -30,9 +31,9 @@ export function DrawMap({ initialGeometry, onBoundaryChange, center }: DrawMapPr
   }, [onBoundaryChange]);
 
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+    if (!mapContainer.current || map.current || !token) return;
 
-    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
+    mapboxgl.accessToken = token;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -92,6 +93,14 @@ export function DrawMap({ initialGeometry, onBoundaryChange, center }: DrawMapPr
       draw.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!token) {
+    return (
+      <div className="w-full h-full rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 text-sm">
+        Map unavailable — NEXT_PUBLIC_MAPBOX_TOKEN not configured
+      </div>
+    );
+  }
 
   return <div ref={mapContainer} className="w-full h-full rounded-lg" />;
 }
