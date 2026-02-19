@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { getStoredToken, clearTokens, verifyOTP, requestOTP } from '@/services/auth';
+import { getStoredToken, clearTokens, verifyOTP, requestOTP, registerAgent } from '@/services/auth';
+import type { RegisterAgentParams } from '@/services/auth';
 import { api } from '@/services/api';
 import type { AgentProfile, ApiResponse } from '@/types/api';
 
@@ -12,6 +13,7 @@ interface AuthState {
   hydrate: () => Promise<void>;
   login: (phone: string, otp: string) => Promise<void>;
   sendOTP: (phone: string) => Promise<void>;
+  register: (params: RegisterAgentParams) => Promise<void>;
   fetchProfile: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -38,6 +40,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   sendOTP: async (phone: string) => {
     await requestOTP(phone);
+  },
+
+  register: async (params: RegisterAgentParams) => {
+    await registerAgent(params);
   },
 
   login: async (phone: string, otp: string) => {

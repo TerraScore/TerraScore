@@ -9,36 +9,50 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/stores/authStore';
 
-type Step = 'phone' | 'otp';
+type Step = 'details' | 'otp';
 
-export default function LoginScreen() {
-  const [step, setStep] = useState<Step>('phone');
+export default function RegisterScreen() {
+  const router = useRouter();
+  const [step, setStep] = useState<Step>('details');
   const [phone, setPhone] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const otpRef = useRef<TextInput>(null);
 
-  const router = useRouter();
-  const { sendOTP, login } = useAuthStore();
+  const { register, login } = useAuthStore();
 
-  const handleRequestOTP = async () => {
+  const handleRegister = async () => {
     const cleaned = phone.replace(/\s/g, '');
     if (cleaned.length < 10) {
       Alert.alert('Invalid Phone', 'Please enter a valid phone number.');
       return;
     }
+    if (fullName.trim().length < 2) {
+      Alert.alert('Invalid Name', 'Please enter your full name.');
+      return;
+    }
 
     setLoading(true);
     try {
-      await sendOTP(cleaned);
+      const params: Parameters<typeof register>[0] = {
+        phone: cleaned.startsWith('+') ? cleaned : `+91${cleaned}`,
+        full_name: fullName.trim(),
+      };
+      if (email.trim()) params.email = email.trim();
+
+      await register(params);
       setStep('otp');
       setTimeout(() => otpRef.current?.focus(), 100);
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error?.message ?? 'Failed to send OTP.');
+      const msg = err?.response?.data?.error?.message ?? 'Registration failed.';
+      Alert.alert('Error', msg);
     } finally {
       setLoading(false);
     }
@@ -53,8 +67,8 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const cleaned = phone.replace(/\s/g, '');
-      await login(cleaned, otp);
-      // Auth gate in root layout handles navigation
+      const fullPhone = cleaned.startsWith('+') ? cleaned : `+91${cleaned}`;
+      await login(fullPhone, otp);
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.error?.message ?? 'Invalid OTP. Please try again.');
     } finally {
@@ -67,13 +81,24 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.inner}>
+      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>TerraScore</Text>
-        <Text style={styles.subtitle}>Agent Login</Text>
+        <Text style={styles.subtitle}>Agent Registration</Text>
 
-        {step === 'phone' ? (
+        {step === 'details' ? (
           <>
-            <Text style={styles.label}>Phone Number</Text>
+            <Text style={styles.label}>Full Name *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your full name"
+              placeholderTextColor="#999"
+              autoCapitalize="words"
+              value={fullName}
+              onChangeText={setFullName}
+              editable={!loading}
+            />
+
+            <Text style={styles.label}>Phone Number *</Text>
             <TextInput
               style={styles.input}
               placeholder="+91 98765 43210"
@@ -84,22 +109,36 @@ export default function LoginScreen() {
               onChangeText={setPhone}
               editable={!loading}
             />
+
+            <Text style={styles.label}>Email (optional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="you@example.com"
+              placeholderTextColor="#999"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
+              editable={!loading}
+            />
+
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleRequestOTP}
+              onPress={handleRegister}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>Send OTP</Text>
+                <Text style={styles.buttonText}>Register & Send OTP</Text>
               )}
             </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.linkButton}
-              onPress={() => router.push('/(auth)/register')}
+              onPress={() => router.replace('/(auth)/login')}
             >
-              <Text style={styles.linkText}>New here? Register as Agent</Text>
+              <Text style={styles.linkText}>Already registered? Login</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -130,15 +169,15 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={styles.linkButton}
               onPress={() => {
-                setStep('phone');
+                setStep('details');
                 setOtp('');
               }}
             >
-              <Text style={styles.linkText}>Change phone number</Text>
+              <Text style={styles.linkText}>Go back</Text>
             </TouchableOpacity>
           </>
         )}
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -149,9 +188,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   inner: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 32,
+    paddingVertical: 40,
   },
   title: {
     fontSize: 32,

@@ -17,3 +17,17 @@ export async function verifyOTP(phone: string, otp: string): Promise<VerifyOTPRe
   await storeTokens(result.access_token, result.refresh_token);
   return result;
 }
+
+export interface RegisterAgentParams {
+  phone: string;
+  full_name: string;
+  email?: string;
+  home_lat?: number;
+  home_lng?: number;
+  state_code?: string;
+  district_code?: string;
+}
+
+export async function registerAgent(params: RegisterAgentParams): Promise<void> {
+  await api.post('/v1/agents/register', params);
+}
