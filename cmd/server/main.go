@@ -168,41 +168,38 @@ func run(ctx context.Context) error {
 	r.Use(platform.Logging(logger))
 	r.Use(platform.Recovery(logger))
 
-	// WebSocket endpoint — no Compress (Compress wraps ResponseWriter, breaking http.Hijacker)
+	r.Use(chimw.Compress(5))
+
+	// Health check
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		platform.JSON(w, http.StatusOK, map[string]string{"status": "ok", "version": Version})
+	})
+
+	// WebSocket endpoint (outside /v1 prefix, auth via query param)
 	r.Get("/ws", wsHandler.ServeWS)
 
-	// All other routes get compression
-	r.Group(func(r chi.Router) {
-		r.Use(chimw.Compress(5))
+	// API v1 routes
+	r.Route("/v1", func(r chi.Router) {
+		r.Mount("/auth", authHandler.Routes())
 
-		// Health check
-		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-			platform.JSON(w, http.StatusOK, map[string]string{"status": "ok", "version": Version})
-		})
+		// Public agent registration (no JWT required)
+		r.Post("/agents/register", agentHandler.Register)
 
-		// API v1 routes
-		r.Route("/v1", func(r chi.Router) {
-			r.Mount("/auth", authHandler.Routes())
+		// Protected routes (JWT required)
+		r.Group(func(r chi.Router) {
+			r.Use(auth.JWTAuth(keycloakClient))
+			r.Mount("/parcels", landHandler.Routes())
+			r.Mount("/agents", agentHandler.Routes())
+			r.Mount("/jobs", jobHandler.Routes())
+			r.Mount("/alerts", notifHandler.Routes())
 
-			// Public agent registration (no JWT required)
-			r.Post("/agents/register", agentHandler.Register)
+			// Report routes
+			r.Get("/parcels/{parcelId}/reports", reportHandler.ListByParcel)
+			r.Get("/reports/{id}/download", reportHandler.Download)
 
-			// Protected routes (JWT required)
-			r.Group(func(r chi.Router) {
-				r.Use(auth.JWTAuth(keycloakClient))
-				r.Mount("/parcels", landHandler.Routes())
-				r.Mount("/agents", agentHandler.Routes())
-				r.Mount("/jobs", jobHandler.Routes())
-				r.Mount("/alerts", notifHandler.Routes())
-
-				// Report routes
-				r.Get("/parcels/{parcelId}/reports", reportHandler.ListByParcel)
-				r.Get("/reports/{id}/download", reportHandler.Download)
-
-				// Agent-specific job/offer routes (explicit to avoid mount conflicts)
-				r.With(auth.RequireRole("agent")).Get("/agents/me/jobs", jobHandler.ListAgentJobs)
-				r.With(auth.RequireRole("agent")).Get("/agents/me/offers", jobHandler.ListAgentOffers)
-			})
+			// Agent-specific job/offer routes (explicit to avoid mount conflicts)
+			r.With(auth.RequireRole("agent")).Get("/agents/me/jobs", jobHandler.ListAgentJobs)
+			r.With(auth.RequireRole("agent")).Get("/agents/me/offers", jobHandler.ListAgentOffers)
 		})
 	})
 
