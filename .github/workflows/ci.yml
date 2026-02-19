@@ -206,7 +206,9 @@ jobs:
           REPO="${{ github.repository }}"
           BRANCH="${{ steps.env.outputs.branch }}"
 
-          # Write cloud-init header
+          GH_PAT="${{ secrets.GH_PAT }}"
+
+          # Write cloud-init config
           cat > /tmp/cloud-init.yml << 'EOF'
           #cloud-config
           package_update: true
@@ -218,24 +220,6 @@ jobs:
             - ca-certificates
 
           write_files:
-            - path: /root/.ssh/deploy_key
-              permissions: "0600"
-              content: |
-          EOF
-
-          # Append deploy key (indented for YAML block scalar — 18 spaces so after 10-space strip it's 8)
-          echo "${{ secrets.GH_DEPLOY_KEY }}" | sed 's/^/                  /' >> /tmp/cloud-init.yml
-
-          cat >> /tmp/cloud-init.yml << 'EOF'
-            - path: /root/.ssh/config
-              permissions: "0644"
-              content: |
-                Host github.com
-                  HostName github.com
-                  User git
-                  IdentityFile /root/.ssh/deploy_key
-                  StrictHostKeyChecking no
-
             - path: /opt/terrascore/.env
               permissions: "0600"
               content: |
@@ -244,13 +228,13 @@ jobs:
           # Append env file contents (indented for YAML block scalar — 18 spaces so after 10-space strip it's 8)
           echo "$APP_ENV" | sed 's/^/                  /' >> /tmp/cloud-init.yml
 
-          # Append runcmd (uses variable expansion for REPO and BRANCH)
+          # Append runcmd (uses variable expansion for REPO, BRANCH, and PAT)
           cat >> /tmp/cloud-init.yml << RUNCMD_EOF
 
           runcmd:
             - |
               curl -fsSL https://get.docker.com | sh
-              git clone -b ${BRANCH} git@github.com:${REPO}.git /opt/terrascore/repo
+              git clone -b ${BRANCH} https://${GH_PAT}@github.com/${REPO}.git /opt/terrascore/repo
               export BRANCH=${BRANCH}
               bash /opt/terrascore/repo/infra/deploy/setup.sh
           RUNCMD_EOF
