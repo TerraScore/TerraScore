@@ -48,8 +48,16 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 # Wait for API to be ready, then run migrations
 echo "Waiting for postgres to be healthy..."
 sleep 10
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T api /bin/terrascore-api migrate up 2>/dev/null || \
-    echo "Migration command not available or already applied — skipping."
+
+# Source env vars for DB connection
+set -a
+source "$ENV_FILE"
+set +a
+
+# Build DB_URL from env vars
+DB_URL="postgres://${DB_USER:-terrascore}:${DB_PASSWORD:-terrascore}@terrascore-postgres:5432/${DB_NAME:-terrascore}?sslmode=disable"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T api /bin/terrascore-migrate -direction up -path /app/db/migrations -db "$DB_URL" || \
+    echo "Migration failed or already applied — skipping."
 
 # Install cron for auto-update
 CRON_LINE="*/10 * * * * BRANCH=$BRANCH /opt/terrascore/repo/infra/deploy/update.sh >> /var/log/terrascore-update.log 2>&1"

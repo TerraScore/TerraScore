@@ -3,7 +3,7 @@ _transform: true
 
 services:
   - name: terrascore-api
-    url: http://host.docker.internal:8080
+    url: http://terrascore-api:8080
     routes:
       - name: api-v1
         paths:
@@ -19,7 +19,7 @@ services:
           - http
 
   - name: keycloak
-    url: http://keycloak:8180
+    url: http://terrascore-keycloak:8180
     routes:
       - name: keycloak-auth
         paths:
@@ -34,6 +34,7 @@ plugins:
     config:
       origins:
         - "http://localhost:3000"
+        - "http://89.167.72.154:3000"
       methods:
         - GET
         - POST
