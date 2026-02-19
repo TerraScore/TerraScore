@@ -1,6 +1,7 @@
 package notification
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -65,6 +66,12 @@ func (h *Handler) ListAlerts(w http.ResponseWriter, r *http.Request) {
 				return false
 			}(),
 			CreatedAt: a.CreatedAt.Time.Format("2006-01-02T15:04:05Z"),
+		}
+		if len(a.Data) > 0 {
+			var data map[string]string
+			if err := json.Unmarshal(a.Data, &data); err == nil {
+				result[i].Data = data
+			}
 		}
 	}
 

@@ -155,11 +155,15 @@ func run(ctx context.Context) error {
 			logger.Error("failed to enqueue QA task", "error", err)
 		}
 		// Notify landowner that survey was submitted
-		if err := taskQueue.Enqueue(ctx, "notification.send", map[string]string{
-			"event_type": "survey.submitted",
-			"user_id":    payload["user_id"],
-			"title":      "Survey Completed",
-			"body":       "An agent has completed the field survey for your parcel. Results are being processed.",
+		if err := taskQueue.Enqueue(ctx, "notification.send", notification.NotificationPayload{
+			EventType: "survey.submitted",
+			UserID:    payload["user_id"],
+			Title:     "Survey Completed",
+			Body:      "An agent has completed the field survey for your parcel. Results are being processed.",
+			Data: map[string]string{
+				"parcel_id": payload["parcel_id"],
+				"job_id":    payload["job_id"],
+			},
 		}); err != nil {
 			logger.Error("failed to enqueue survey notification", "error", err)
 		}

@@ -1,25 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
-import type { ApiResponse } from "@/lib/types";
 
 export interface Alert {
   id: string;
   type: string;
   title: string;
   body: string | null;
+  data?: Record<string, string>;
   is_read: boolean;
   created_at: string;
-}
-
-export interface UnreadCount {
-  unread_count: number;
 }
 
 export function useAlerts(page = 1) {
   return useQuery({
     queryKey: ["alerts", page],
     queryFn: () =>
-      apiClient.get<ApiResponse<Alert[]>>(`/api/alerts?page=${page}&per_page=20`),
+      apiClient.get<Alert[]>(`/api/alerts?page=${page}&per_page=20`),
     refetchInterval: 30000, // Poll every 30s for new alerts
   });
 }
@@ -28,9 +24,9 @@ export function useUnreadCount() {
   return useQuery({
     queryKey: ["alerts", "unread-count"],
     queryFn: () =>
-      apiClient.get<ApiResponse<UnreadCount>>("/api/alerts?page=1&per_page=1"),
+      apiClient.get<{ unread_count: number }>("/api/alerts/unread/count"),
     refetchInterval: 30000,
-    select: (data) => data,
+    select: (data) => data.unread_count,
   });
 }
 
