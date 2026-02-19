@@ -8,18 +8,31 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// ParcelEmbed is a lightweight parcel representation embedded in job responses.
+type ParcelEmbed struct {
+	ID              uuid.UUID   `json:"id"`
+	Label           *string     `json:"label,omitempty"`
+	Village         *string     `json:"village,omitempty"`
+	Taluk           *string     `json:"taluk,omitempty"`
+	District        string      `json:"district"`
+	State           string      `json:"state"`
+	BoundaryGeoJSON interface{} `json:"boundary_geojson,omitempty"`
+	AreaSqm         *float32    `json:"area_sqm,omitempty"`
+}
+
 // JobResponse is the API representation of a survey job.
 type JobResponse struct {
-	ID              uuid.UUID  `json:"id"`
-	ParcelID        uuid.UUID  `json:"parcel_id"`
-	UserID          uuid.UUID  `json:"user_id"`
-	SurveyType      string     `json:"survey_type"`
-	Priority        *string    `json:"priority,omitempty"`
-	Deadline        time.Time  `json:"deadline"`
-	Status          *string    `json:"status"`
-	AssignedAgentID *uuid.UUID `json:"assigned_agent_id,omitempty"`
-	AssignedAt      *time.Time `json:"assigned_at,omitempty"`
-	CreatedAt       time.Time  `json:"created_at"`
+	ID              uuid.UUID    `json:"id"`
+	ParcelID        uuid.UUID    `json:"parcel_id"`
+	UserID          uuid.UUID    `json:"user_id"`
+	SurveyType      string       `json:"survey_type"`
+	Priority        *string      `json:"priority,omitempty"`
+	Deadline        time.Time    `json:"deadline"`
+	Status          *string      `json:"status"`
+	AssignedAgentID *uuid.UUID   `json:"assigned_agent_id,omitempty"`
+	AssignedAt      *time.Time   `json:"assigned_at,omitempty"`
+	CreatedAt       time.Time    `json:"created_at"`
+	Parcel          *ParcelEmbed `json:"parcel,omitempty"`
 }
 
 // OfferResponse is the API representation of a job offer.

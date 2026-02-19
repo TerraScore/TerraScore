@@ -107,7 +107,7 @@ func run(ctx context.Context) error {
 	matcher := job.NewMatcher(agentQueries, jobRepo, logger)
 	dispatcher := job.NewDispatcher(matcher, jobRepo, rdb, eventBus, logger)
 	jobScheduler := job.NewScheduler(jobRepo, landRepo, eventBus, logger)
-	jobHandler := job.NewHandler(jobRepo, agentRepo, surveyRepo, s3Client, rdb, eventBus, logger)
+	jobHandler := job.NewHandler(jobRepo, agentRepo, surveyRepo, agentQueries, s3Client, rdb, eventBus, logger)
 
 	// QA module
 	qaRepo := qa.NewRepository(db)

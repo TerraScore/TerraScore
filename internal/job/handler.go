@@ -25,6 +25,7 @@ type Handler struct {
 	jobRepo    *Repository
 	agentRepo  *agent.Repository
 	surveyRepo *survey.Repository
+	queries    *sqlc.Queries
 	s3Client   *platform.S3Client
 	rdb        *redis.Client
 	eventBus   *platform.EventBus
@@ -32,11 +33,12 @@ type Handler struct {
 }
 
 // NewHandler creates a job handler.
-func NewHandler(jobRepo *Repository, agentRepo *agent.Repository, surveyRepo *survey.Repository, s3Client *platform.S3Client, rdb *redis.Client, eventBus *platform.EventBus, logger *slog.Logger) *Handler {
+func NewHandler(jobRepo *Repository, agentRepo *agent.Repository, surveyRepo *survey.Repository, queries *sqlc.Queries, s3Client *platform.S3Client, rdb *redis.Client, eventBus *platform.EventBus, logger *slog.Logger) *Handler {
 	return &Handler{
 		jobRepo:    jobRepo,
 		agentRepo:  agentRepo,
 		surveyRepo: surveyRepo,
+		queries:    queries,
 		s3Client:   s3Client,
 		rdb:        rdb,
 		eventBus:   eventBus,
@@ -201,10 +203,27 @@ func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	platform.JSON(w, http.StatusOK, JobResponseFromSqlc(
+	resp := JobResponseFromSqlc(
 		job.ID, job.ParcelID, job.UserID, job.SurveyType, job.Priority,
 		job.Deadline, job.Status, job.AssignedAgentID, job.AssignedAt, job.CreatedAt,
-	))
+	)
+
+	// Enrich with parcel data for navigation
+	parcel, err := h.queries.GetParcelWithGeoJSON(r.Context(), job.ParcelID)
+	if err == nil {
+		resp.Parcel = &ParcelEmbed{
+			ID:              parcel.ID,
+			Label:           parcel.Label,
+			Village:         parcel.Village,
+			Taluk:           parcel.Taluk,
+			District:        parcel.District,
+			State:           parcel.State,
+			BoundaryGeoJSON: parcel.BoundaryGeojson,
+			AreaSqm:         parcel.AreaSqm,
+		}
+	}
+
+	platform.JSON(w, http.StatusOK, resp)
 }
 
 // ListAgentJobs handles GET /v1/agents/me/jobs.
