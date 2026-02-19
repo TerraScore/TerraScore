@@ -48,6 +48,7 @@ services:
       timeout: 10s
       retries: 10
       start_period: 30s
+    restart: unless-stopped
 
   kong:
     image: kong:3.6
@@ -63,9 +64,7 @@ services:
       - "8001:8001"   # Admin API
     volumes:
       - ./infra/kong/kong.yml:/etc/kong/kong.yml:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
+    restart: unless-stopped
 
   minio:
     image: minio/minio:latest
@@ -84,6 +83,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   minio-init:
     image: minio/mc:latest
