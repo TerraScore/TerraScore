@@ -162,43 +162,47 @@ func run(ctx context.Context) error {
 	// Router
 	r := chi.NewRouter()
 
-	// Global middleware
+	// Global middleware (applied to all routes)
 	r.Use(chimw.RealIP)
 	r.Use(platform.RequestID)
 	r.Use(platform.Logging(logger))
 	r.Use(platform.Recovery(logger))
-	r.Use(chimw.Compress(5))
 
-	// Health check
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		platform.JSON(w, http.StatusOK, map[string]string{"status": "ok", "version": Version})
-	})
-
-	// WebSocket endpoint (outside /v1 prefix, no JWT middleware — auth via query param)
+	// WebSocket endpoint — no Compress (Compress wraps ResponseWriter, breaking http.Hijacker)
 	r.Get("/ws", wsHandler.ServeWS)
 
-	// API v1 routes
-	r.Route("/v1", func(r chi.Router) {
-		r.Mount("/auth", authHandler.Routes())
+	// All other routes get compression
+	r.Group(func(r chi.Router) {
+		r.Use(chimw.Compress(5))
 
-		// Public agent registration (no JWT required)
-		r.Post("/agents/register", agentHandler.Register)
+		// Health check
+		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+			platform.JSON(w, http.StatusOK, map[string]string{"status": "ok", "version": Version})
+		})
 
-		// Protected routes (JWT required)
-		r.Group(func(r chi.Router) {
-			r.Use(auth.JWTAuth(keycloakClient))
-			r.Mount("/parcels", landHandler.Routes())
-			r.Mount("/agents", agentHandler.Routes())
-			r.Mount("/jobs", jobHandler.Routes())
-			r.Mount("/alerts", notifHandler.Routes())
+		// API v1 routes
+		r.Route("/v1", func(r chi.Router) {
+			r.Mount("/auth", authHandler.Routes())
 
-			// Report routes
-			r.Get("/parcels/{parcelId}/reports", reportHandler.ListByParcel)
-			r.Get("/reports/{id}/download", reportHandler.Download)
+			// Public agent registration (no JWT required)
+			r.Post("/agents/register", agentHandler.Register)
 
-			// Agent-specific job/offer routes (explicit to avoid mount conflicts)
-			r.With(auth.RequireRole("agent")).Get("/agents/me/jobs", jobHandler.ListAgentJobs)
-			r.With(auth.RequireRole("agent")).Get("/agents/me/offers", jobHandler.ListAgentOffers)
+			// Protected routes (JWT required)
+			r.Group(func(r chi.Router) {
+				r.Use(auth.JWTAuth(keycloakClient))
+				r.Mount("/parcels", landHandler.Routes())
+				r.Mount("/agents", agentHandler.Routes())
+				r.Mount("/jobs", jobHandler.Routes())
+				r.Mount("/alerts", notifHandler.Routes())
+
+				// Report routes
+				r.Get("/parcels/{parcelId}/reports", reportHandler.ListByParcel)
+				r.Get("/reports/{id}/download", reportHandler.Download)
+
+				// Agent-specific job/offer routes (explicit to avoid mount conflicts)
+				r.With(auth.RequireRole("agent")).Get("/agents/me/jobs", jobHandler.ListAgentJobs)
+				r.With(auth.RequireRole("agent")).Get("/agents/me/offers", jobHandler.ListAgentOffers)
+			})
 		})
 	})
 
