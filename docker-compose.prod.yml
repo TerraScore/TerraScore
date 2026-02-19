@@ -29,6 +29,7 @@ services:
       - "3000:3000"
     environment:
       API_URL: http://terrascore-kong:8000
+      SERVER_ENV: ${SERVER_ENV:-production}
     depends_on:
       api:
         condition: service_started

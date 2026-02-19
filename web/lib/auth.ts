@@ -5,7 +5,7 @@ const REFRESH_COOKIE = "li_refresh";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
+  secure: process.env.NODE_ENV === "production" && process.env.SERVER_ENV !== "staging",
   sameSite: "lax" as const,
   path: "/",
 };
