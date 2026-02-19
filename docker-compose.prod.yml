@@ -24,6 +24,7 @@ services:
       context: ./web
       args:
         VERSION: ${VERSION:-dev}
+        NEXT_PUBLIC_MAPTILER_KEY: ${NEXT_PUBLIC_MAPTILER_KEY:-}
     container_name: terrascore-web
     ports:
       - "3000:3000"
