@@ -157,7 +157,7 @@ type FindMatchableAgentsRow struct {
 	KeycloakID         *string            `json:"keycloak_id"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
-	DistanceKm         int32              `json:"distance_km"`
+	DistanceKm         float64            `json:"distance_km"`
 }
 
 func (q *Queries) FindMatchableAgents(ctx context.Context, arg FindMatchableAgentsParams) ([]FindMatchableAgentsRow, error) {
@@ -283,7 +283,7 @@ type FindNearbyAgentsRow struct {
 	KeycloakID         *string            `json:"keycloak_id"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
-	DistanceKm         int32              `json:"distance_km"`
+	DistanceKm         float64            `json:"distance_km"`
 }
 
 func (q *Queries) FindNearbyAgents(ctx context.Context, arg FindNearbyAgentsParams) ([]FindNearbyAgentsRow, error) {
