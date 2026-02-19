@@ -1,6 +1,14 @@
 {
   "realm": "terrascore",
   "enabled": true,
+  "requiredActions": [
+    {
+      "alias": "VERIFY_PROFILE",
+      "name": "Verify Profile",
+      "enabled": false,
+      "defaultAction": false
+    }
+  ],
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
