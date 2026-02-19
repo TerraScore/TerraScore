@@ -93,6 +93,10 @@ export function DashboardMap({ parcels, selectedParcel, onMarkerClick }: Dashboa
 
     if (!selectedParcel?.boundary_geojson) return;
 
+    const boundary: GeoJSON.Geometry = typeof selectedParcel.boundary_geojson === "string"
+      ? JSON.parse(selectedParcel.boundary_geojson)
+      : selectedParcel.boundary_geojson;
+
     // Wait for style to load
     const addBoundary = () => {
       m.addSource("selected-boundary", {
@@ -100,7 +104,7 @@ export function DashboardMap({ parcels, selectedParcel, onMarkerClick }: Dashboa
         data: {
           type: "Feature",
           properties: {},
-          geometry: selectedParcel.boundary_geojson as GeoJSON.Geometry,
+          geometry: boundary,
         },
       });
 
@@ -125,8 +129,8 @@ export function DashboardMap({ parcels, selectedParcel, onMarkerClick }: Dashboa
       });
 
       // Fit to boundary
-      const coords = (selectedParcel.boundary_geojson as GeoJSON.Polygon).coordinates[0];
-      if (coords) {
+      const coords = (boundary as GeoJSON.Polygon)?.coordinates?.[0];
+      if (coords?.length) {
         const bounds = new maplibregl.LngLatBounds();
         coords.forEach((coord) => bounds.extend(coord as [number, number]));
         m.fitBounds(bounds, { padding: 80, maxZoom: 16 });

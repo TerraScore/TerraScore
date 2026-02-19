@@ -203,11 +203,11 @@ export default function ParcelDetailPage({ params }: { params: { id: string } })
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden h-[600px]">
           {isEditing ? (
             <DrawMap
-              initialGeometry={parcel.boundary_geojson as GeoJSON.Geometry}
+              initialGeometry={typeof parcel.boundary_geojson === "string" ? JSON.parse(parcel.boundary_geojson) : parcel.boundary_geojson}
               onBoundaryChange={handleBoundaryChange}
             />
           ) : parcel.boundary_geojson ? (
-            <ParcelMap boundary={parcel.boundary_geojson as GeoJSON.Geometry} />
+            <ParcelMap boundary={typeof parcel.boundary_geojson === "string" ? JSON.parse(parcel.boundary_geojson) : parcel.boundary_geojson} />
           ) : (
             <div className="flex items-center justify-center h-full text-gray-400">
               <p>No boundary defined</p>

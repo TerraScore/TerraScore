@@ -58,7 +58,7 @@ export function ParcelMap({ boundary }: ParcelMapProps) {
       });
 
       // Fit to boundary
-      if (boundary.type === "Polygon") {
+      if (boundary.type === "Polygon" && boundary.coordinates?.[0]?.length) {
         const bounds = new maplibregl.LngLatBounds();
         boundary.coordinates[0].forEach((coord) =>
           bounds.extend(coord as [number, number])
