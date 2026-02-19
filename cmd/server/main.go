@@ -181,6 +181,9 @@ func run(ctx context.Context) error {
 	r.Route("/v1", func(r chi.Router) {
 		r.Mount("/auth", authHandler.Routes())
 
+		// Public agent registration (no JWT required)
+		r.Post("/agents/register", agentHandler.Register)
+
 		// Protected routes (JWT required)
 		r.Group(func(r chi.Router) {
 			r.Use(auth.JWTAuth(keycloakClient))
