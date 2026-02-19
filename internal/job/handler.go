@@ -702,6 +702,78 @@ func (h *Handler) GetTemplate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ListParcelSurveys handles GET /v1/parcels/{parcelId}/surveys.
+// Returns jobs with survey/QA info for the landowner.
+func (h *Handler) ListParcelSurveys(w http.ResponseWriter, r *http.Request) {
+	userCtx := auth.GetUser(r.Context())
+	if userCtx == nil {
+		platform.JSONError(w, http.StatusUnauthorized, platform.CodeUnauthorized, "not authenticated")
+		return
+	}
+
+	parcelID, err := uuid.Parse(chi.URLParam(r, "parcelId"))
+	if err != nil {
+		platform.HandleError(w, platform.NewBadRequest("invalid parcel ID"))
+		return
+	}
+
+	// Verify ownership
+	user, err := h.queries.GetUserByKeycloakID(r.Context(), &userCtx.KeycloakID)
+	if err != nil {
+		platform.HandleError(w, platform.NewNotFound("user not found"))
+		return
+	}
+	parcel, err := h.queries.GetParcelByID(r.Context(), parcelID)
+	if err != nil {
+		platform.HandleError(w, platform.NewNotFound("parcel not found"))
+		return
+	}
+	if parcel.UserID != user.ID {
+		platform.JSONError(w, http.StatusForbidden, "FORBIDDEN", "not your parcel")
+		return
+	}
+
+	jobs, err := h.jobRepo.ListJobsByParcel(r.Context(), parcelID, 50, 0)
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	var results []ParcelSurveyResponse
+	for _, j := range jobs {
+		resp := ParcelSurveyResponse{
+			ID:         j.ID,
+			SurveyType: j.SurveyType,
+			Status:     j.Status,
+		}
+		if j.QaScore.Valid {
+			f, _ := j.QaScore.Float64Value()
+			if f.Valid {
+				resp.QAScore = &f.Float64
+			}
+		}
+		resp.QAStatus = j.QaStatus
+		resp.QANotes = j.QaNotes
+		if j.CreatedAt.Valid {
+			resp.CreatedAt = j.CreatedAt.Time
+		}
+		if j.CompletedAt.Valid {
+			t := j.CompletedAt.Time
+			resp.CompletedAt = &t
+		}
+
+		// Fetch survey responses if submitted
+		sr, err := h.surveyRepo.GetSurveyResponseByJob(r.Context(), j.ID)
+		if err == nil {
+			resp.Responses = sr.Responses
+		}
+
+		results = append(results, resp)
+	}
+
+	platform.JSON(w, http.StatusOK, results)
+}
+
 // extensionFromContentType maps common content types to file extensions.
 func extensionFromContentType(ct string) string {
 	switch strings.ToLower(ct) {

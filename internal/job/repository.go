@@ -115,6 +115,19 @@ func (r *Repository) ListJobsByAgent(ctx context.Context, agentID uuid.UUID, lim
 	return jobs, nil
 }
 
+// ListJobsByParcel returns paginated jobs for a parcel.
+func (r *Repository) ListJobsByParcel(ctx context.Context, parcelID uuid.UUID, limit, offset int32) ([]sqlc.SurveyJob, error) {
+	jobs, err := r.q.ListJobsByParcel(ctx, sqlc.ListJobsByParcelParams{
+		ParcelID: parcelID,
+		Limit:    limit,
+		Offset:   offset,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("listing jobs by parcel: %w", err)
+	}
+	return jobs, nil
+}
+
 // CreateOffer inserts a new job offer.
 func (r *Repository) CreateOffer(ctx context.Context, params sqlc.CreateJobOfferParams) (*sqlc.JobOffer, error) {
 	offer, err := r.q.CreateJobOffer(ctx, params)

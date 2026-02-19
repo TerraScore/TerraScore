@@ -140,7 +140,7 @@ func run(ctx context.Context) error {
 	// Subscribe dispatcher to job.created events
 	eventBus.Subscribe("job.created", dispatcher.HandleJobCreated)
 
-	// Subscribe to survey.submitted — enqueues QA scoring task
+	// Subscribe to survey.submitted — enqueues QA scoring + notifies landowner
 	eventBus.Subscribe("survey.submitted", func(ctx context.Context, event platform.Event) {
 		payload, ok := event.Payload.(map[string]string)
 		if !ok {
@@ -153,6 +153,15 @@ func run(ctx context.Context) error {
 			UserID:   payload["user_id"],
 		}); err != nil {
 			logger.Error("failed to enqueue QA task", "error", err)
+		}
+		// Notify landowner that survey was submitted
+		if err := taskQueue.Enqueue(ctx, "notification.send", map[string]string{
+			"event_type": "survey.submitted",
+			"user_id":    payload["user_id"],
+			"title":      "Survey Completed",
+			"body":       "An agent has completed the field survey for your parcel. Results are being processed.",
+		}); err != nil {
+			logger.Error("failed to enqueue survey notification", "error", err)
 		}
 	})
 
@@ -193,8 +202,9 @@ func run(ctx context.Context) error {
 			r.Mount("/jobs", jobHandler.Routes())
 			r.Mount("/alerts", notifHandler.Routes())
 
-			// Landowner requests a survey for their parcel
+			// Landowner parcel actions
 			r.With(auth.RequireRole("landowner")).Post("/parcels/{parcelId}/request-survey", jobHandler.RequestSurvey)
+			r.With(auth.RequireRole("landowner")).Get("/parcels/{parcelId}/surveys", jobHandler.ListParcelSurveys)
 
 			// Report routes
 			r.Get("/parcels/{parcelId}/reports", reportHandler.ListByParcel)

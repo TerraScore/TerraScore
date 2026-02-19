@@ -33,6 +33,9 @@ func NewS3Client(cfg AWSConfig) (*S3Client, error) {
 		opts = append(opts, func(o *s3.Options) {
 			o.BaseEndpoint = aws.String(cfg.S3Endpoint)
 			o.UsePathStyle = true // Required for MinIO and Hetzner
+			// Disable checksums for non-TLS endpoints (MinIO over HTTP)
+			o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
+			o.ResponseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
 		})
 	}
 

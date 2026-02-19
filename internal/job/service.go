@@ -89,6 +89,19 @@ type MediaResponse struct {
 	UploadedAt time.Time `json:"uploaded_at"`
 }
 
+// ParcelSurveyResponse is the API representation of a job with survey/QA info for landowners.
+type ParcelSurveyResponse struct {
+	ID         uuid.UUID       `json:"id"`
+	SurveyType string          `json:"survey_type"`
+	Status     *string         `json:"status"`
+	QAScore    *float64        `json:"qa_score,omitempty"`
+	QAStatus   *string         `json:"qa_status,omitempty"`
+	QANotes    *string         `json:"qa_notes,omitempty"`
+	Responses  json.RawMessage `json:"responses,omitempty"`
+	CreatedAt  time.Time       `json:"created_at"`
+	CompletedAt *time.Time     `json:"completed_at,omitempty"`
+}
+
 // SurveySubmitRequest is the payload for submitting a survey.
 type SurveySubmitRequest struct {
 	Responses       json.RawMessage `json:"responses"`
