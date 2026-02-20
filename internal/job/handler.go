@@ -2,8 +2,10 @@ package job
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -51,6 +53,16 @@ func NewHandler(jobRepo *Repository, agentRepo *agent.Repository, surveyRepo *su
 		eventBus:   eventBus,
 		logger:     logger,
 	}
+}
+
+// publishAgentEvent sends a real-time event to an agent's WebSocket via Redis pub/sub.
+func (h *Handler) publishAgentEvent(ctx context.Context, agentID uuid.UUID, eventType string, data map[string]string) {
+	payload, _ := json.Marshal(map[string]interface{}{
+		"type": eventType,
+		"data": data,
+	})
+	channel := "agent:" + agentID.String() + ":events"
+	h.rdb.Publish(ctx, channel, string(payload))
 }
 
 // Routes returns the job router.
@@ -118,6 +130,11 @@ func (h *Handler) AcceptOffer(w http.ResponseWriter, r *http.Request) {
 		"job_id", jobID,
 		"offer_id", offer.ID,
 	)
+
+	// Notify agent via WebSocket
+	h.publishAgentEvent(r.Context(), ag.ID, "job.accepted", map[string]string{
+		"job_id": jobID.String(),
+	})
 
 	// Return the job details
 	job, err := h.jobRepo.GetJobByID(r.Context(), jobID)
@@ -444,6 +461,11 @@ func (h *Handler) Arrive(w http.ResponseWriter, r *http.Request) {
 		"job_id", jobID,
 		"distance_m", distM,
 	)
+
+	// Notify agent via WebSocket
+	h.publishAgentEvent(r.Context(), ag.ID, "job.arrived", map[string]string{
+		"job_id": jobID.String(),
+	})
 
 	platform.JSON(w, http.StatusOK, map[string]any{
 		"message":    "arrival confirmed",
@@ -790,6 +812,11 @@ func (h *Handler) SubmitSurvey(w http.ResponseWriter, r *http.Request) {
 		"job_id", jobID,
 		"survey_response_id", surveyResp.ID,
 	)
+
+	// Notify agent via WebSocket
+	h.publishAgentEvent(r.Context(), ag.ID, "job.survey_submitted", map[string]string{
+		"job_id": jobID.String(),
+	})
 
 	platform.JSON(w, http.StatusOK, map[string]any{
 		"message":            "survey submitted",

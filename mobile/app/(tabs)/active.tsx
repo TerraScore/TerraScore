@@ -9,10 +9,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { api } from '@/services/api';
+import { onAgentEvent } from '@/hooks/useJobOffers';
 import type { Job, ApiResponse } from '@/types/api';
 
-const ACTIVE_STATUSES = ['assigned', 'agent_arrived', 'survey_in_progress'];
+const ACTIVE_STATUSES = ['assigned', 'agent_arrived', 'survey_in_progress', 'agent_en_route'];
 
 export default function ActiveJobsScreen() {
   const router = useRouter();
@@ -34,8 +36,25 @@ export default function ActiveJobsScreen() {
     }
   }, []);
 
+  // Refetch when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchJobs();
+    }, [fetchJobs]),
+  );
+
+  // Listen for real-time WebSocket events
   useEffect(() => {
-    fetchJobs();
+    const unsub = onAgentEvent((eventType) => {
+      if (
+        eventType === 'job.accepted' ||
+        eventType === 'job.arrived' ||
+        eventType === 'job.survey_submitted'
+      ) {
+        fetchJobs();
+      }
+    });
+    return unsub;
   }, [fetchJobs]);
 
   const onRefresh = useCallback(async () => {
@@ -106,6 +125,8 @@ function formatStatus(status: string | null | undefined): string {
   switch (status) {
     case 'assigned':
       return 'Assigned';
+    case 'agent_en_route':
+      return 'En Route';
     case 'agent_arrived':
       return 'Arrived';
     case 'survey_in_progress':
@@ -119,6 +140,8 @@ function statusColor(status: string | null | undefined) {
   switch (status) {
     case 'assigned':
       return { backgroundColor: '#dbeafe' };
+    case 'agent_en_route':
+      return { backgroundColor: '#e0e7ff' };
     case 'agent_arrived':
       return { backgroundColor: '#dcfce7' };
     case 'survey_in_progress':

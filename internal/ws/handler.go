@@ -87,9 +87,12 @@ func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
-	// Subscribe to Redis channel for this agent's offers
-	channel := "agent:" + ag.ID.String() + ":offers"
-	sub := h.rdb.Subscribe(ctx, channel)
+	// Subscribe to Redis channels for this agent's real-time events
+	agentID := ag.ID.String()
+	sub := h.rdb.Subscribe(ctx,
+		"agent:"+agentID+":offers",
+		"agent:"+agentID+":events",
+	)
 	defer sub.Close()
 
 	// Read pump: reads client messages for pong keepalive

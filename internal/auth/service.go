@@ -4,10 +4,29 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/terrascore/api/db/sqlc"
 	"github.com/terrascore/api/internal/platform"
 )
+
+// NormalizePhone ensures phone is in +91XXXXXXXXXX format.
+// Accepts: "9876543210", "91XXXXXXXXXX", "+91XXXXXXXXXX", "+91 98765 43210".
+func NormalizePhone(phone string) string {
+	// Strip spaces, dashes, parens
+	phone = strings.NewReplacer(" ", "", "-", "", "(", "", ")", "").Replace(phone)
+	if strings.HasPrefix(phone, "+91") {
+		return phone
+	}
+	if strings.HasPrefix(phone, "91") && len(phone) == 12 {
+		return "+" + phone
+	}
+	// 10-digit number
+	if len(phone) == 10 {
+		return "+91" + phone
+	}
+	return phone // return as-is if unrecognized
+}
 
 // Service orchestrates the auth flow.
 type Service struct {
@@ -46,6 +65,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 	if req.Phone == "" || req.FullName == "" {
 		return nil, platform.NewValidation("phone and full_name are required")
 	}
+	req.Phone = NormalizePhone(req.Phone)
 	if req.Role == "" {
 		req.Role = "landowner"
 	}
@@ -120,6 +140,7 @@ func (s *Service) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*VerifyO
 	if req.Phone == "" || req.OTP == "" {
 		return nil, platform.NewValidation("phone and otp are required")
 	}
+	req.Phone = NormalizePhone(req.Phone)
 
 	valid, err := s.otp.VerifyOTP(ctx, req.Phone, req.OTP)
 	if err != nil {
@@ -164,6 +185,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*RegisterRespons
 	if req.Phone == "" {
 		return nil, platform.NewValidation("phone is required")
 	}
+	req.Phone = NormalizePhone(req.Phone)
 
 	// Verify user exists in either users or agents table
 	_, err := s.repo.GetKeycloakIDByPhone(ctx, req.Phone)

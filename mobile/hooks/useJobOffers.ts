@@ -8,7 +8,16 @@ const WS_BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080')
   .replace(/^http/, 'ws');
 
 const RECONNECT_DELAY_MS = 3000;
-const POLL_INTERVAL_MS = 30000;
+const POLL_INTERVAL_MS = 15000; // Poll every 15s as fallback
+
+// Global event listeners for cross-screen real-time updates
+type EventCallback = (eventType: string, data: Record<string, string>) => void;
+const eventListeners = new Set<EventCallback>();
+
+export function onAgentEvent(cb: EventCallback) {
+  eventListeners.add(cb);
+  return () => { eventListeners.delete(cb); };
+}
 
 export function useJobOffers() {
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -57,10 +66,23 @@ export function useJobOffers() {
 
     ws.onmessage = (event) => {
       try {
-        const msg: WSOfferMessage = JSON.parse(event.data);
+        const msg = JSON.parse(event.data);
+
+        // Handle offer messages (from offers channel)
         if (msg.offer_id) {
-          // Fetch full offer details from REST
           fetchOffers();
+          return;
+        }
+
+        // Handle general events (from events channel)
+        if (msg.type && msg.data) {
+          // Notify all listeners (active jobs screen, etc.)
+          eventListeners.forEach((cb) => cb(msg.type, msg.data));
+
+          // Also refresh offers if job status changed
+          if (msg.type === 'job.accepted' || msg.type === 'job.survey_submitted') {
+            fetchOffers();
+          }
         }
       } catch {
         // ignore malformed messages
@@ -89,8 +111,10 @@ export function useJobOffers() {
 
     // Reconnect when app comes to foreground
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && !wsRef.current) {
-        connectWS();
+      if (state === 'active') {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          connectWS();
+        }
         fetchOffers();
       }
     });

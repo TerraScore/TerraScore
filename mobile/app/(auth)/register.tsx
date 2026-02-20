@@ -30,8 +30,8 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     const cleaned = phone.replace(/\s/g, '');
-    if (cleaned.length < 10) {
-      Alert.alert('Invalid Phone', 'Please enter a valid phone number.');
+    if (cleaned.length !== 10) {
+      Alert.alert('Invalid Phone', 'Please enter a valid 10-digit phone number.');
       return;
     }
     if (fullName.trim().length < 2) {
@@ -42,7 +42,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       const params: Parameters<typeof register>[0] = {
-        phone: cleaned.startsWith('+') ? cleaned : `+91${cleaned}`,
+        phone: cleaned,
         full_name: fullName.trim(),
       };
       if (email.trim()) params.email = email.trim();
@@ -67,8 +67,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       const cleaned = phone.replace(/\s/g, '');
-      const fullPhone = cleaned.startsWith('+') ? cleaned : `+91${cleaned}`;
-      await login(fullPhone, otp);
+      await login(cleaned, otp);
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.error?.message ?? 'Invalid OTP. Please try again.');
     } finally {
@@ -82,12 +81,14 @@ export default function RegisterScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>TerraScore</Text>
-        <Text style={styles.subtitle}>Agent Registration</Text>
+        <View style={styles.logoSection}>
+          <Text style={styles.title}>LandIntel</Text>
+          <Text style={styles.subtitle}>Agent Registration</Text>
+        </View>
 
         {step === 'details' ? (
           <>
-            <Text style={styles.label}>Full Name *</Text>
+            <Text style={styles.label}>Full Name</Text>
             <TextInput
               style={styles.input}
               placeholder="Enter your full name"
@@ -98,17 +99,22 @@ export default function RegisterScreen() {
               editable={!loading}
             />
 
-            <Text style={styles.label}>Phone Number *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="+91 98765 43210"
-              placeholderTextColor="#999"
-              keyboardType="phone-pad"
-              autoComplete="tel"
-              value={phone}
-              onChangeText={setPhone}
-              editable={!loading}
-            />
+            <Text style={styles.label}>Phone Number</Text>
+            <View style={styles.phoneRow}>
+              <View style={styles.countryCode}>
+                <Text style={styles.countryCodeText}>+91</Text>
+              </View>
+              <TextInput
+                style={styles.phoneInput}
+                placeholder="98765 43210"
+                placeholderTextColor="#999"
+                keyboardType="number-pad"
+                value={phone}
+                onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, '').slice(0, 10))}
+                maxLength={10}
+                editable={!loading}
+              />
+            </View>
 
             <Text style={styles.label}>Email (optional)</Text>
             <TextInput
@@ -143,16 +149,21 @@ export default function RegisterScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.label}>Enter OTP sent to {phone}</Text>
+            <View style={styles.otpBanner}>
+              <Text style={styles.otpBannerText}>
+                OTP sent to <Text style={styles.otpPhone}>+91 {phone}</Text>
+              </Text>
+            </View>
+            <Text style={styles.label}>Enter OTP</Text>
             <TextInput
               ref={otpRef}
-              style={styles.input}
-              placeholder="Enter OTP"
-              placeholderTextColor="#999"
+              style={styles.otpInput}
+              placeholder="------"
+              placeholderTextColor="#ccc"
               keyboardType="number-pad"
               maxLength={6}
               value={otp}
-              onChangeText={setOtp}
+              onChangeText={(t) => setOtp(t.replace(/[^0-9]/g, ''))}
               editable={!loading}
             />
             <TouchableOpacity
@@ -190,40 +201,100 @@ const styles = StyleSheet.create({
   inner: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 28,
     paddingVertical: 40,
+  },
+  logoSection: {
+    marginBottom: 40,
   },
   title: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#1a1a2e',
+    color: '#059669',
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 40,
     marginTop: 4,
   },
   label: {
     fontSize: 14,
-    color: '#333',
+    fontWeight: '500',
+    color: '#374151',
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#111827',
+    marginBottom: 20,
+    backgroundColor: '#f9fafb',
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 20,
+    backgroundColor: '#f9fafb',
+  },
+  countryCode: {
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+    backgroundColor: '#f3f4f6',
+    borderRightWidth: 1,
+    borderRightColor: '#d1d5db',
+  },
+  countryCodeText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  phoneInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: 18,
+    color: '#111827',
+    letterSpacing: 1,
+  },
+  otpBanner: {
+    backgroundColor: '#ecfdf5',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 20,
+  },
+  otpBannerText: {
+    fontSize: 14,
+    color: '#065f46',
+  },
+  otpPhone: {
+    fontWeight: '600',
+  },
+  otpInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    fontSize: 18,
-    color: '#1a1a2e',
+    fontSize: 24,
+    color: '#111827',
     marginBottom: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f9fafb',
+    textAlign: 'center',
+    letterSpacing: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   button: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#059669',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -241,7 +312,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   linkText: {
-    color: '#2563eb',
+    color: '#059669',
     fontSize: 14,
   },
 });

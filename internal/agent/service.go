@@ -107,6 +107,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*RegisterR
 	if req.Phone == "" || req.FullName == "" {
 		return nil, platform.NewValidation("phone and full_name are required")
 	}
+	req.Phone = auth.NormalizePhone(req.Phone)
 
 	// Create user in Keycloak
 	kcUser := auth.KeycloakUser{
