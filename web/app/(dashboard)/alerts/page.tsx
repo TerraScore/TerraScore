@@ -113,7 +113,7 @@ export default function AlertsPage() {
   const markRead = useMarkAlertRead();
   const markAllRead = useMarkAllAlertsRead();
 
-  const alerts: Alert[] = Array.isArray(data) ? data : [];
+  const alerts: Alert[] = data?.data ?? [];
   const hasUnread = alerts.some((a) => !a.is_read);
 
   if (isLoading) {

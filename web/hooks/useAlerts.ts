@@ -15,7 +15,7 @@ export function useAlerts(page = 1) {
   return useQuery({
     queryKey: ["alerts", page],
     queryFn: () =>
-      apiClient.get<Alert[]>(`/api/alerts?page=${page}&per_page=20`),
+      apiClient.get<{ data: Alert[] }>(`/api/alerts?page=${page}&per_page=20`),
     refetchInterval: 30000, // Poll every 30s for new alerts
   });
 }
@@ -24,9 +24,9 @@ export function useUnreadCount() {
   return useQuery({
     queryKey: ["alerts", "unread-count"],
     queryFn: () =>
-      apiClient.get<{ unread_count: number }>("/api/alerts/unread/count"),
+      apiClient.get<{ data: { unread_count: number } }>("/api/alerts/unread/count"),
     refetchInterval: 30000,
-    select: (data) => data.unread_count,
+    select: (resp) => resp.data.unread_count,
   });
 }
 
