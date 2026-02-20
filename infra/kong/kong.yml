@@ -63,5 +63,5 @@ plugins:
   - name: request-size-limiting
     service: terrascore-api
     config:
-      allowed_payload_size: 10
+      allowed_payload_size: 32
       size_unit: megabytes

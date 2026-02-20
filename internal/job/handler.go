@@ -1,11 +1,16 @@
 package job
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -60,6 +65,7 @@ func (h *Handler) Routes() chi.Router {
 		r.Get("/{id}", h.GetJob)
 		r.Post("/{id}/arrive", h.Arrive)
 		r.Get("/{id}/media/presigned", h.PresignedURL)
+		r.Post("/{id}/media/upload", h.UploadMedia)
 		r.Post("/{id}/media", h.RecordMedia)
 		r.Post("/{id}/survey", h.SubmitSurvey)
 		r.Get("/{id}/template", h.GetTemplate)
@@ -485,6 +491,131 @@ func (h *Handler) PresignedURL(w http.ResponseWriter, r *http.Request) {
 		UploadURL: url,
 		S3Key:     s3Key,
 		ExpiresIn: int(ttl.Seconds()),
+	})
+}
+
+// UploadMedia handles POST /v1/jobs/{id}/media/upload.
+// Accepts multipart form data, uploads to S3 server-side, and records metadata.
+// This proxies the upload through the API to avoid mobile clients needing direct S3 access.
+func (h *Handler) UploadMedia(w http.ResponseWriter, r *http.Request) {
+	userCtx := auth.GetUser(r.Context())
+	if userCtx == nil {
+		platform.JSONError(w, http.StatusUnauthorized, platform.CodeUnauthorized, "not authenticated")
+		return
+	}
+
+	jobID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		platform.HandleError(w, platform.NewBadRequest("invalid job ID"))
+		return
+	}
+
+	// 32 MB max
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		platform.HandleError(w, platform.NewBadRequest("invalid multipart form"))
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		platform.HandleError(w, platform.NewBadRequest("file field is required"))
+		return
+	}
+	defer file.Close()
+
+	stepID := r.FormValue("step_id")
+	mediaType := r.FormValue("media_type")
+	latStr := r.FormValue("lat")
+	lngStr := r.FormValue("lng")
+	capturedAtStr := r.FormValue("captured_at")
+
+	if stepID == "" || mediaType == "" {
+		platform.HandleError(w, platform.NewBadRequest("step_id and media_type are required"))
+		return
+	}
+
+	lat, _ := strconv.ParseFloat(latStr, 64)
+	lng, _ := strconv.ParseFloat(lngStr, 64)
+
+	capturedAt := time.Now()
+	if capturedAtStr != "" {
+		if t, err := time.Parse(time.RFC3339, capturedAtStr); err == nil {
+			capturedAt = t
+		}
+	}
+
+	// Read file into memory for hashing and upload
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		platform.HandleError(w, platform.NewInternal("failed to read uploaded file", err))
+		return
+	}
+
+	// Compute SHA-256
+	hash := sha256.Sum256(fileBytes)
+	fileSHA256 := hex.EncodeToString(hash[:])
+
+	// Determine content type and extension
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	ext := extensionFromContentType(contentType)
+
+	// Build S3 key
+	s3Key := fmt.Sprintf("media/%s/%s/%s.%s", jobID, stepID, uuid.New(), ext)
+
+	// Upload to S3
+	if err := h.s3Client.PutObject(r.Context(), s3Key, contentType, bytes.NewReader(fileBytes)); err != nil {
+		h.logger.Error("failed to upload media to S3", "error", err)
+		platform.HandleError(w, platform.NewInternal("failed to upload file", err))
+		return
+	}
+
+	// Resolve agent
+	ag, err := h.agentRepo.GetAgentByKeycloakID(r.Context(), userCtx.KeycloakID)
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	fileSize := int64(len(fileBytes))
+	media, err := h.surveyRepo.CreateSurveyMedia(r.Context(), sqlc.CreateSurveyMediaParams{
+		JobID:          jobID,
+		AgentID:        ag.ID,
+		StepID:         stepID,
+		MediaType:      mediaType,
+		S3Key:          s3Key,
+		FileSizeBytes:  &fileSize,
+		StMakepoint:    lng,
+		StMakepoint_2:  lat,
+		CapturedAt:     capturedAt,
+		FileHashSha256: fileSHA256,
+	})
+	if err != nil {
+		platform.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("media uploaded via proxy",
+		"agent_id", ag.ID,
+		"job_id", jobID,
+		"media_id", media.ID,
+		"step_id", stepID,
+		"size_bytes", fileSize,
+	)
+
+	platform.JSON(w, http.StatusCreated, MediaResponse{
+		ID:        media.ID,
+		S3Key:     media.S3Key,
+		StepID:    media.StepID,
+		MediaType: media.MediaType,
+		UploadedAt: func() time.Time {
+			if media.UploadedAt.Valid {
+				return media.UploadedAt.Time
+			}
+			return time.Now()
+		}(),
 	})
 }
 
