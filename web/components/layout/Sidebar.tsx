@@ -42,7 +42,7 @@ export function Sidebar() {
   const router = useRouter();
   const { profile, clearAuth } = useAuthStore();
   const { data: alertsData } = useAlerts();
-  const unreadCount = alertsData?.data?.filter((a) => !a.is_read).length ?? 0;
+  const unreadCount = Array.isArray(alertsData) ? alertsData.filter((a) => !a.is_read).length : 0;
 
   async function handleLogout() {
     await apiClient.post("/api/auth/logout");
